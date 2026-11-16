@@ -1,0 +1,15 @@
+{
+  "name": "skillbridge-qa-audit",
+  "private": true,
+  "type": "module",
+  "description": "Ferramentas da auditoria de QA (isoladas do projeto). Ver RELATORIO.md.",
+  "scripts": {
+    "mock": "node scripts/mock-supabase.mjs",
+    "serve": "node scripts/serve-app.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "lighthouse": "^13.6.0",
+    "playwright": "^1.65.1"
+  }
+}
