@@ -4,69 +4,69 @@ import type { MentorActivity } from '../../../types'
 interface MentorActivityRow {
   id: string
   mentor_id: string
-  student_id: string
-  title: string
-  description: string | null
-  due_date: string | null
+  aluno_id: string
+  titulo: string
+  descricao: string | null
+  prazo: string | null
   status: MentorActivity['status']
-  created_at: string
-  submission: string | null
-  submission_url: string | null
-  submitted_at: string | null
-  feedback: string | null
-  reviewed_at: string | null
+  criado_em: string
+  resposta: string | null
+  url_resposta: string | null
+  entregue_em: string | null
+  comentario: string | null
+  avaliado_em: string | null
 }
 
 function toActivity(row: MentorActivityRow): MentorActivity {
   return {
     id: row.id,
     mentorId: row.mentor_id,
-    studentId: row.student_id,
-    title: row.title,
-    description: row.description ?? undefined,
-    dueDate: row.due_date ?? undefined,
+    studentId: row.aluno_id,
+    title: row.titulo,
+    description: row.descricao ?? undefined,
+    dueDate: row.prazo ?? undefined,
     status: row.status,
-    createdAt: row.created_at,
-    submission: row.submission ?? undefined,
-    submissionUrl: row.submission_url ?? undefined,
-    submittedAt: row.submitted_at ?? undefined,
-    feedback: row.feedback ?? undefined,
-    reviewedAt: row.reviewed_at ?? undefined,
+    createdAt: row.criado_em,
+    submission: row.resposta ?? undefined,
+    submissionUrl: row.url_resposta ?? undefined,
+    submittedAt: row.entregue_em ?? undefined,
+    feedback: row.comentario ?? undefined,
+    reviewedAt: row.avaliado_em ?? undefined,
   }
 }
 
 export async function fetchMentorActivities(): Promise<MentorActivity[]> {
-  const { data, error } = await supabase.from('mentor_activities').select('*').order('created_at', { ascending: false })
+  const { data, error } = await supabase.from('atividade_mentoria').select('*').order('criado_em', { ascending: false })
   if (error) throw error
   return (data ?? []).map(toActivity)
 }
 
 export async function insertActivityRow(input: { mentorId: string; studentId: string; title: string; description?: string; dueDate?: string }) {
-  const { error } = await supabase.from('mentor_activities').insert({
+  const { error } = await supabase.from('atividade_mentoria').insert({
     mentor_id: input.mentorId,
-    student_id: input.studentId,
-    title: input.title,
-    description: input.description || null,
-    due_date: input.dueDate || null,
+    aluno_id: input.studentId,
+    titulo: input.title,
+    descricao: input.description || null,
+    prazo: input.dueDate || null,
   })
   if (error) throw error
 }
 
 export async function updateActivityStatusRow(id: string, status: MentorActivity['status']) {
-  const { error } = await supabase.from('mentor_activities').update({ status }).eq('id', id)
+  const { error } = await supabase.from('atividade_mentoria').update({ status }).eq('id', id)
   if (error) throw error
 }
 
 /** Revisão do mentor: aprovar (concluida) ou pedir ajustes (pendente), com comentário opcional. */
 export async function reviewActivityRow(id: string, status: Extract<MentorActivity['status'], 'pendente' | 'concluida'>, feedback?: string) {
   const { error } = await supabase
-    .from('mentor_activities')
-    .update({ status, feedback: feedback?.trim() || null, reviewed_at: new Date().toISOString() })
+    .from('atividade_mentoria')
+    .update({ status, comentario: feedback?.trim() || null, avaliado_em: new Date().toISOString() })
     .eq('id', id)
   if (error) throw error
 }
 
 export async function deleteActivityRow(id: string) {
-  const { error } = await supabase.from('mentor_activities').delete().eq('id', id)
+  const { error } = await supabase.from('atividade_mentoria').delete().eq('id', id)
   if (error) throw error
 }

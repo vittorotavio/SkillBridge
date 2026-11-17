@@ -62,11 +62,43 @@ export interface Company extends BaseUser {
   adminUsers: { id: string; name: string; email: string; role: string }[]
 }
 
+/**
+ * Pergunta de múltipla escolha da atividade de uma aula. `correct` (índice em `options`) e
+ * `explanation` vêm do gabarito, que só o admin da empresa lê: o aluno recebe só pergunta e
+ * alternativas, e a correção é feita no servidor (answer_lesson_activity).
+ */
+export interface ActivityQuestion {
+  question: string
+  options: string[]
+  correct?: number
+  explanation?: string
+}
+
+/** Atividade de aula em que o aluno acertou todas as perguntas (registrada pelo servidor). */
+export interface ActivityPass {
+  studentId: string
+  courseId: string
+  moduleIndex: number
+  lessonIndex: number
+  /** Alternativas marcadas (todas certas), para mostrar a atividade como concluída. */
+  answers: number[]
+}
+
+/** Conteúdo de uma aula: vídeo (com crédito/licença), material de leitura e atividade. Tudo opcional. */
+export interface LessonContent {
+  videoUrl?: string
+  videoCredit?: string
+  material?: string
+  activity?: ActivityQuestion[]
+}
+
 export interface Module {
   id: string
   title: string
   duration: string // "2h30"
   lessons: string[]
+  /** Mesma ordem de `lessons`; posições faltando = aula sem vídeo nem material. */
+  contents?: LessonContent[]
 }
 
 export interface Course {

@@ -19,6 +19,12 @@ const byCode: Record<string, string> = {
   over_email_send_rate_limit: 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.',
   over_request_rate_limit: 'Muitas tentativas em pouco tempo. Aguarde alguns minutos e tente novamente.',
   signup_disabled: 'Novos cadastros estão desativados no momento.',
+  // Redefinição de senha
+  same_password: 'A nova senha precisa ser diferente da senha atual.',
+  session_not_found: 'Seu link de redefinição expirou. Peça um novo link.',
+  session_expired: 'Seu link de redefinição expirou. Peça um novo link.',
+  reauthentication_needed: 'Por segurança, peça um novo link de redefinição e tente de novo.',
+  email_address_not_authorized: 'O envio de e-mails do projeto ainda não está liberado para este endereço. Fale com o suporte.',
 }
 
 /**
