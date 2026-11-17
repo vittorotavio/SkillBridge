@@ -18,7 +18,10 @@ const typeConfig: Record<AccountType, { label: string; icon: typeof GraduationCa
 
 export default function Login() {
   // Quem chega de um link protegido (ex: card de curso na tela inicial) volta para lá depois de entrar.
-  const rawFrom = (useLocation().state as { from?: string } | null)?.from
+  const locationState = useLocation().state as { from?: string; notice?: string } | null
+  const rawFrom = locationState?.from
+  // Aviso de outra tela (ex.: "Senha alterada" depois da redefinição).
+  const notice = locationState?.notice
   // Só caminhos internos do próprio app (evita redirecionar para "//outro-site").
   const from = rawFrom && rawFrom.startsWith('/') && !rawFrom.startsWith('//') ? rawFrom : undefined
   const fromType = accountTypeForPath(from)
@@ -92,9 +95,30 @@ export default function Login() {
             })}
           </div>
 
+          {notice && (
+            <p className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300" role="status">
+              {notice}
+            </p>
+          )}
+
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-            <Input label="E-mail" type="email" placeholder="voce@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <Input label="Senha" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <Input label="E-mail" type="email" placeholder="voce@email.com" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <div>
+              <Input
+                label="Senha"
+                type="password"
+                placeholder="••••••••"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <div className="mt-1.5 text-right">
+                <Link to="/esqueci-senha" state={{ email: email.trim() }} className="text-xs font-semibold text-primary-600 hover:underline">
+                  Esqueci minha senha
+                </Link>
+              </div>
+            </div>
 
             {error && <p className="text-sm font-semibold text-red-600">{error}</p>}
 

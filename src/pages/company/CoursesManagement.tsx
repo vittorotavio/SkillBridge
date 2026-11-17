@@ -16,21 +16,51 @@ import { useDataStore } from '../../store/dataStore'
 import { CATEGORIES, parseLessons } from '../../lib/catalog'
 import { friendlyError } from '../../lib/errors'
 import { safeHttpUrl } from '../../lib/validation'
-import type { Course, CourseStatus } from '../../types'
+import { parseVideoSource, VIDEO_SOURCE_HINT } from '../../lib/video'
+import { normalizeQuestion } from '../../lib/activity'
+import type { ActivityQuestion, Course, CourseStatus, LessonContent, Module } from '../../types'
+
+const OPTION_SLOTS = 4
+const blankQuestion = (): ActivityQuestion => ({ question: '', options: Array(OPTION_SLOTS).fill(''), correct: 0, explanation: '' })
+/** No editor, toda pergunta mostra 4 campos de alternativa; os vazios são descartados ao salvar. */
+const padQuestion = (q: ActivityQuestion): ActivityQuestion => ({
+  ...q,
+  options: [...q.options, ...Array(Math.max(0, OPTION_SLOTS - q.options.length)).fill('')],
+})
 
 /**
  * Módulo em edição. As aulas ficam como texto livre (uma por linha) e só viram lista ao salvar:
  * antes o campo convertia a cada tecla e descartava a linha vazia, então o Enter "sumia" e não dava
- * para digitar a segunda aula.
+ * para digitar a segunda aula. O vídeo/material de cada aula fica guardado pelo título dela, para
+ * acompanhar a aula quando as linhas são reordenadas ou outras aulas entram no meio.
  */
 interface ModuleDraft {
   id: string
   title: string
   duration: string
   lessonsText: string
+  contents: Record<string, LessonContent>
 }
 
-const emptyModule = (): ModuleDraft => ({ id: `mod-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, title: '', duration: '', lessonsText: '' })
+const emptyModule = (): ModuleDraft => ({
+  id: `mod-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  title: '',
+  duration: '',
+  lessonsText: '',
+  contents: {},
+})
+
+function toDraft(m: Module): ModuleDraft {
+  const contents: Record<string, LessonContent> = {}
+  m.lessons.forEach((lesson, i) => {
+    const c = m.contents?.[i]
+    if (c && !(lesson in contents)) contents[lesson] = { ...c, activity: c.activity?.map(padQuestion) }
+  })
+  return { id: m.id, title: m.title, duration: m.duration, lessonsText: m.lessons.join('\n'), contents }
+}
+
+const fieldClass =
+  'w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none'
 
 const blankForm = () => ({
   title: '',
@@ -86,9 +116,7 @@ export default function CoursesManagement() {
       coverUrl: course.coverUrl,
       status: course.status,
       programIds: course.programIds,
-      modules: course.modules.length
-        ? course.modules.map((m) => ({ id: m.id, title: m.title, duration: m.duration, lessonsText: m.lessons.join('\n') }))
-        : [emptyModule()],
+      modules: course.modules.length ? course.modules.map(toDraft) : [emptyModule()],
     })
     setFormError(null)
     setFormOpen(true)
@@ -98,11 +126,50 @@ export default function CoursesManagement() {
     setForm((f) => ({ ...f, modules: f.modules.map((m) => (m.id === id ? { ...m, ...patch } : m)) }))
   }
 
+  const updateLessonContent = (moduleId: string, lesson: string, patch: Partial<LessonContent>) => {
+    setForm((f) => ({
+      ...f,
+      modules: f.modules.map((m) => (m.id === moduleId ? { ...m, contents: { ...m.contents, [lesson]: { ...m.contents[lesson], ...patch } } } : m)),
+    }))
+  }
+
+  const updateQuestion = (moduleId: string, lesson: string, qi: number, patch: Partial<ActivityQuestion> | null) => {
+    const mod = form.modules.find((m) => m.id === moduleId)
+    const current = mod?.contents[lesson]?.activity ?? []
+    const next = patch === null ? current.filter((_, i) => i !== qi) : current.map((q, i) => (i === qi ? { ...q, ...patch } : q))
+    updateLessonContent(moduleId, lesson, { activity: next })
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const modules = form.modules
-      .map((m) => ({ id: m.id, title: m.title.trim(), duration: m.duration.trim(), lessons: parseLessons(m.lessonsText) }))
+      .map((m) => {
+        const lessons = parseLessons(m.lessonsText)
+        return { id: m.id, title: m.title.trim(), duration: m.duration.trim(), lessons, contents: lessons.map((l) => m.contents[l] ?? {}) }
+      })
       .filter((m) => m.title || m.lessons.length)
+    for (const m of modules) {
+      const badVideo = m.lessons.findIndex((_, i) => m.contents[i].videoUrl?.trim() && !parseVideoSource(m.contents[i].videoUrl))
+      if (badVideo >= 0) {
+        setFormError(
+          `O vídeo da aula "${m.lessons[badVideo]}" precisa ser ${VIDEO_SOURCE_HINT}: só assim dá para conferir se o aluno assistiu até o fim.`
+        )
+        return
+      }
+      // Atividades: descarta perguntas em branco e recusa as incompletas (sem alternativa certa etc.).
+      for (let i = 0; i < m.lessons.length; i++) {
+        const activity: ActivityQuestion[] = []
+        for (const q of m.contents[i].activity ?? []) {
+          const { question, error } = normalizeQuestion(q)
+          if (error) {
+            setFormError(`Atividade da aula "${m.lessons[i]}": ${error}.`)
+            return
+          }
+          if (question) activity.push(question)
+        }
+        m.contents[i] = { ...m.contents[i], activity: activity.length ? activity : undefined }
+      }
+    }
     const untitled = modules.findIndex((m) => !m.title)
     // Módulo sem título era descartado em silêncio, junto com as aulas digitadas nele.
     if (untitled >= 0) {
@@ -326,6 +393,108 @@ export default function CoursesManagement() {
                         onChange={(e) => updateModule(mod.id, { lessonsText: e.target.value })}
                       />
                       <p className="text-xs text-slate-400">{parseLessons(mod.lessonsText).length} aula(s)</p>
+                      {parseLessons(mod.lessonsText).length > 0 && (
+                        <details className="group rounded-lg bg-slate-50 dark:bg-slate-900/40">
+                          <summary className="cursor-pointer select-none px-3 py-2 text-xs font-bold text-primary-600 dark:text-primary-300">
+                            Vídeo, material e atividade das aulas
+                          </summary>
+                          <div className="space-y-4 px-3 pb-3">
+                            {parseLessons(mod.lessonsText).map((lesson, lessonIdx) => {
+                              const c = mod.contents[lesson] ?? {}
+                              return (
+                                <div key={`${lessonIdx}-${lesson}`} className="space-y-1.5">
+                                  <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                    {lessonIdx + 1}. {lesson}
+                                  </p>
+                                  <input
+                                    className={fieldClass}
+                                    aria-label={`Link do vídeo da aula ${lesson}`}
+                                    placeholder="Link do vídeo (YouTube ou arquivo .mp4/.webm). O aluno precisa assistir até o fim."
+                                    value={c.videoUrl ?? ''}
+                                    onChange={(e) => updateLessonContent(mod.id, lesson, { videoUrl: e.target.value })}
+                                  />
+                                  <input
+                                    className={fieldClass}
+                                    aria-label={`Crédito do vídeo da aula ${lesson}`}
+                                    placeholder="Crédito do vídeo (autor e licença), se houver"
+                                    value={c.videoCredit ?? ''}
+                                    onChange={(e) => updateLessonContent(mod.id, lesson, { videoCredit: e.target.value })}
+                                  />
+                                  <textarea
+                                    className={fieldClass}
+                                    aria-label={`Material da aula ${lesson}`}
+                                    placeholder={'Material da aula. Separe parágrafos com uma linha em branco; use "- " para listas.'}
+                                    rows={4}
+                                    value={c.material ?? ''}
+                                    onChange={(e) => updateLessonContent(mod.id, lesson, { material: e.target.value })}
+                                  />
+                                  <div className="space-y-2 rounded-lg border border-dashed border-slate-200 p-2.5 dark:border-slate-700">
+                                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                                      Atividade: o aluno precisa acertar todas as perguntas para concluir a aula.
+                                    </p>
+                                    {(c.activity ?? []).map((q, qi) => (
+                                      <div key={qi} className="space-y-1.5 rounded-lg bg-white p-2.5 dark:bg-slate-800">
+                                        <div className="flex items-start gap-2">
+                                          <input
+                                            className={fieldClass}
+                                            aria-label={`Pergunta ${qi + 1} da aula ${lesson}`}
+                                            placeholder={`Pergunta ${qi + 1}`}
+                                            value={q.question}
+                                            onChange={(e) => updateQuestion(mod.id, lesson, qi, { question: e.target.value })}
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => updateQuestion(mod.id, lesson, qi, null)}
+                                            className="mt-2 shrink-0 text-slate-300 hover:text-red-500"
+                                            aria-label={`Remover pergunta ${qi + 1} da aula ${lesson}`}
+                                          >
+                                            <X size={15} />
+                                          </button>
+                                        </div>
+                                        {q.options.map((option, oi) => (
+                                          <div key={oi} className="flex items-center gap-2 pl-1">
+                                            <input
+                                              type="radio"
+                                              name={`certa-${mod.id}-${lessonIdx}-${qi}`}
+                                              className="accent-primary-600"
+                                              checked={q.correct === oi}
+                                              onChange={() => updateQuestion(mod.id, lesson, qi, { correct: oi })}
+                                              aria-label={`Alternativa ${oi + 1} é a certa`}
+                                            />
+                                            <input
+                                              className={fieldClass}
+                                              aria-label={`Alternativa ${oi + 1} da pergunta ${qi + 1}`}
+                                              placeholder={`Alternativa ${oi + 1}${oi >= 2 ? ' (opcional)' : ''}`}
+                                              value={option}
+                                              onChange={(e) =>
+                                                updateQuestion(mod.id, lesson, qi, { options: q.options.map((o, k) => (k === oi ? e.target.value : o)) })
+                                              }
+                                            />
+                                          </div>
+                                        ))}
+                                        <input
+                                          className={fieldClass}
+                                          aria-label={`Explicação da pergunta ${qi + 1}`}
+                                          placeholder="Explicação mostrada depois do acerto (opcional)"
+                                          value={q.explanation ?? ''}
+                                          onChange={(e) => updateQuestion(mod.id, lesson, qi, { explanation: e.target.value })}
+                                        />
+                                      </div>
+                                    ))}
+                                    <button
+                                      type="button"
+                                      onClick={() => updateLessonContent(mod.id, lesson, { activity: [...(c.activity ?? []), blankQuestion()] })}
+                                      className="flex items-center gap-1 text-xs font-bold text-primary-600 hover:underline"
+                                    >
+                                      <Plus size={13} /> Adicionar pergunta
+                                    </button>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </details>
+                      )}
                     </div>
                     {form.modules.length > 1 && (
                       <button

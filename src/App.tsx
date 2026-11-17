@@ -1,7 +1,8 @@
-import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense, useEffect } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { INFO_PAGES } from './pages/institutional/infoPages'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { isRecoverySession, onPasswordRecovery, RESET_PASSWORD_PATH } from './lib/supabase/passwordRecovery'
 
 // Cada tela vira um pedaço separado do bundle, baixado só quando a rota é aberta (antes tudo ia num
 // único arquivo de ~720 kB, acima do limite recomendado pelo Vite).
@@ -10,6 +11,8 @@ const InfoPage = lazy(() => import('./pages/institutional/InfoPage'))
 const Login = lazy(() => import('./pages/auth/Login'))
 const RegisterStudentMentor = lazy(() => import('./pages/auth/RegisterStudentMentor'))
 const RegisterCompany = lazy(() => import('./pages/auth/RegisterCompany'))
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'))
 
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard'))
 const ExploreCourses = lazy(() => import('./pages/student/ExploreCourses'))
@@ -47,9 +50,31 @@ function RouteFallback() {
   )
 }
 
+/**
+ * O link do e-mail de redefinição de senha deve abrir /redefinir-senha. Se o Supabase mandar para
+ * outra página (URL não liberada nas configurações de Auth cai na página inicial), leva até lá.
+ */
+let initialRecoveryChecked = false
+function PasswordRecoveryRedirect() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    const go = () => {
+      if (window.location.pathname !== RESET_PASSWORD_PATH) navigate(RESET_PASSWORD_PATH, { replace: true })
+    }
+    // Só na abertura do link: quem saiu da página sem trocar a senha não é puxado de volta depois.
+    if (!initialRecoveryChecked) {
+      initialRecoveryChecked = true
+      if (isRecoverySession()) go()
+    }
+    return onPasswordRecovery(go)
+  }, [navigate])
+  return null
+}
+
 export default function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
+      <PasswordRecoveryRedirect />
       <Routes>
         <Route path="/" element={<Landing />} />
         {INFO_PAGES.map((slug) => (
@@ -58,6 +83,8 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/cadastro" element={<RegisterStudentMentor />} />
         <Route path="/cadastro/empresa" element={<RegisterCompany />} />
+        <Route path="/esqueci-senha" element={<ForgotPassword />} />
+        <Route path={RESET_PASSWORD_PATH} element={<ResetPassword />} />
 
         {/* Painel do Aluno */}
         <Route
