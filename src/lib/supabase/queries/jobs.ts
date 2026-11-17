@@ -3,42 +3,42 @@ import type { Job, JobApplication } from '../../../types'
 
 interface JobRow {
   id: string
-  company_id: string
-  title: string
-  description: string
-  requirements: string[]
-  department: string
-  type: Job['type']
-  mode: Job['mode']
-  location: string | null
+  empresa_id: string
+  titulo: string
+  descricao: string
+  requisito: string[]
+  departamento: string
+  tipo: Job['type']
+  modalidade: Job['mode']
+  localizacao: string | null
   status: Job['status']
-  applications_count: number
-  created_at: string
-  job_programs?: { program_id: string }[]
+  total_candidatura: number
+  criado_em: string
+  vaga_programa?: { programa_id: string }[]
 }
 
 function toJob(row: JobRow): Job {
   return {
     id: row.id,
-    companyId: row.company_id,
-    title: row.title,
-    description: row.description,
-    requirements: row.requirements ?? [],
-    department: row.department,
-    type: row.type,
-    mode: row.mode,
-    location: row.location ?? '',
-    programIds: (row.job_programs ?? []).map((jp) => jp.program_id),
+    companyId: row.empresa_id,
+    title: row.titulo,
+    description: row.descricao,
+    requirements: row.requisito ?? [],
+    department: row.departamento,
+    type: row.tipo,
+    mode: row.modalidade,
+    location: row.localizacao ?? '',
+    programIds: (row.vaga_programa ?? []).map((jp) => jp.programa_id),
     status: row.status,
-    applicationsCount: row.applications_count,
-    createdAt: row.created_at.slice(0, 10),
+    applicationsCount: row.total_candidatura,
+    createdAt: row.criado_em.slice(0, 10),
   }
 }
 
-const SELECT = '*, job_programs(program_id)'
+const SELECT = '*, vaga_programa(programa_id)'
 
 export async function fetchJobs(): Promise<Job[]> {
-  const { data, error } = await supabase.from('jobs').select(SELECT)
+  const { data, error } = await supabase.from('vaga').select(SELECT)
   if (error) throw error
   return (data ?? []).map(toJob)
 }
@@ -48,71 +48,71 @@ export async function insertJobRow(input: Omit<Job, 'id' | 'applicationsCount' |
   // (fn_job_visible) consulta a própria tabela e ainda não enxerga a linha nova — o Postgres recusava o insert.
   const jobId = crypto.randomUUID()
   const { error } = await supabase
-    .from('jobs')
+    .from('vaga')
     .insert({
       id: jobId,
-      company_id: input.companyId,
-      title: input.title,
-      description: input.description,
-      requirements: input.requirements,
-      department: input.department,
-      type: input.type,
-      mode: input.mode,
-      location: input.location,
+      empresa_id: input.companyId,
+      titulo: input.title,
+      descricao: input.description,
+      requisito: input.requirements,
+      departamento: input.department,
+      tipo: input.type,
+      modalidade: input.mode,
+      localizacao: input.location,
       status: input.status,
     })
   if (error) throw error
   if (input.programIds.length) {
-    const { error: jpErr } = await supabase.from('job_programs').insert(input.programIds.map((pid) => ({ job_id: jobId, program_id: pid })))
+    const { error: jpErr } = await supabase.from('vaga_programa').insert(input.programIds.map((pid) => ({ vaga_id: jobId, programa_id: pid })))
     if (jpErr) throw jpErr
   }
 }
 
 export async function updateJobRow(id: string, patch: Partial<Job>) {
   const fields: Record<string, unknown> = {}
-  if (patch.title !== undefined) fields.title = patch.title
-  if (patch.description !== undefined) fields.description = patch.description
-  if (patch.requirements !== undefined) fields.requirements = patch.requirements
-  if (patch.department !== undefined) fields.department = patch.department
-  if (patch.type !== undefined) fields.type = patch.type
-  if (patch.mode !== undefined) fields.mode = patch.mode
-  if (patch.location !== undefined) fields.location = patch.location
+  if (patch.title !== undefined) fields.titulo = patch.title
+  if (patch.description !== undefined) fields.descricao = patch.description
+  if (patch.requirements !== undefined) fields.requisito = patch.requirements
+  if (patch.department !== undefined) fields.departamento = patch.department
+  if (patch.type !== undefined) fields.tipo = patch.type
+  if (patch.mode !== undefined) fields.modalidade = patch.mode
+  if (patch.location !== undefined) fields.localizacao = patch.location
   if (patch.status !== undefined) fields.status = patch.status
   if (Object.keys(fields).length) {
-    const { error } = await supabase.from('jobs').update(fields).eq('id', id)
+    const { error } = await supabase.from('vaga').update(fields).eq('id', id)
     if (error) throw error
   }
   if (patch.programIds) {
-    const { error: delErr } = await supabase.from('job_programs').delete().eq('job_id', id)
+    const { error: delErr } = await supabase.from('vaga_programa').delete().eq('vaga_id', id)
     if (delErr) throw delErr
     if (patch.programIds.length) {
-      const { error } = await supabase.from('job_programs').insert(patch.programIds.map((pid) => ({ job_id: id, program_id: pid })))
+      const { error } = await supabase.from('vaga_programa').insert(patch.programIds.map((pid) => ({ vaga_id: id, programa_id: pid })))
       if (error) throw error
     }
   }
 }
 
 export async function deleteJobRow(id: string) {
-  const { error } = await supabase.from('jobs').delete().eq('id', id)
+  const { error } = await supabase.from('vaga').delete().eq('id', id)
   if (error) throw error
 }
 
 interface JobApplicationRow {
   id: string
-  job_id: string
-  student_id: string
+  vaga_id: string
+  aluno_id: string
   status: JobApplication['status']
-  applied_at: string
+  candidatado_em: string
 }
 
 export async function fetchJobApplications(): Promise<JobApplication[]> {
-  const { data, error } = await supabase.from('job_applications').select('*')
+  const { data, error } = await supabase.from('candidatura').select('*')
   if (error) throw error
   return (data ?? []).map((row: JobApplicationRow) => ({
     id: row.id,
-    jobId: row.job_id,
-    studentId: row.student_id,
+    jobId: row.vaga_id,
+    studentId: row.aluno_id,
     status: row.status,
-    appliedAt: row.applied_at.slice(0, 10),
+    appliedAt: row.candidatado_em.slice(0, 10),
   }))
 }

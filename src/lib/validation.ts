@@ -5,7 +5,7 @@ export function cnpjDigits(value: string): string {
 
 /**
  * Confere os dois dígitos verificadores do CNPJ. Sem isso o cadastro aceitava qualquer texto,
- * e como `companies.cnpj` é único, "123" de uma empresa travava o cadastro de outra.
+ * e como `empresa.cnpj` é único, "123" de uma empresa travava o cadastro de outra.
  */
 export function isValidCnpj(value: string): boolean {
   const digits = cnpjDigits(value)
