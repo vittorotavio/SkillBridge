@@ -51,9 +51,11 @@ export default function Landing() {
   // A navegação via <Link to="/#secao"> não rola até a âncora sozinha — o React Router só troca a URL.
   // Depende também de location.key: clicar de novo em "Cursos" (mesmo hash) precisa rolar outra vez.
   useEffect(() => {
-    if (!location.hash) return
-    const el = document.querySelector(location.hash)
-    el?.scrollIntoView({ behavior: 'smooth' })
+    // Só âncoras da página (#cursos, #mentoria...). Links de e-mail do Supabase chegam com
+    // "#access_token=...&type=recovery", que não é seletor válido: o querySelector lançava erro e a
+    // página inteira ficava em branco.
+    if (!/^#[A-Za-z][\w-]*$/.test(location.hash)) return
+    document.getElementById(location.hash.slice(1))?.scrollIntoView({ behavior: 'smooth' })
   }, [location.hash, location.key])
 
   // Catálogo público real (o RLS libera cursos públicos publicados e mentores gerais até para visitantes).
@@ -89,8 +91,8 @@ export default function Landing() {
       <section className="relative overflow-hidden">
         <div className="absolute -top-24 right-0 h-96 w-96 rounded-full bg-primary-100 blur-3xl dark:bg-primary-500/10" />
         <div className="absolute top-40 -left-24 h-72 w-72 rounded-full bg-cta-100 blur-3xl dark:bg-cta-500/10" />
-        <div className="relative mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-6 py-20 lg:grid-cols-2 lg:py-28">
-          <div>
+        <div className="relative mx-auto max-w-7xl px-6 py-20 lg:py-28">
+          <div className="max-w-3xl">
             <span className="inline-flex items-center gap-2 rounded-full bg-primary-50 dark:bg-primary-500/10 px-3.5 py-1.5 text-xs font-bold text-primary-700 ring-1 ring-primary-200">
               <BadgeCheck size={14} /> Upskilling + Mentoria + Empresas
             </span>
@@ -116,31 +118,6 @@ export default function Landing() {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="relative hidden lg:block">
-            <Card padding="lg" className="rotate-2">
-              <div className="flex items-center gap-3">
-                <Avatar name="Rafael Nogueira" />
-                <div>
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Rafael Nogueira</p>
-                  <p className="text-xs text-slate-400">Trilha de Talentos TechNova</p>
-                </div>
-              </div>
-              <div className="mt-4 h-2 w-full rounded-full bg-slate-100 dark:bg-slate-700/60">
-                <div className="h-2 w-2/3 rounded-full bg-primary" />
-              </div>
-              <p className="mt-2 text-xs font-semibold text-primary-600">67% da trilha concluída</p>
-            </Card>
-            <Card padding="md" className="absolute -bottom-8 -left-10 w-56 -rotate-3 shadow-card">
-              <div className="flex items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cta-50 text-cta-600">
-                  <Star size={16} fill="currentColor" />
-                </div>
-                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">4.9/5</p>
-              </div>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">avaliação média das mentorias</p>
-            </Card>
           </div>
         </div>
       </section>

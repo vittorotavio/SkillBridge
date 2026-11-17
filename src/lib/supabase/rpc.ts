@@ -31,8 +31,36 @@ export async function completeLesson(courseId: string, moduleIndex: number, less
     p_module_index: moduleIndex,
     p_lesson_index: lessonIndex,
   })
-  if (error) throw error
+  if (error) {
+    if (/activity not passed/.test(error.message)) throw userError('Acerte todas as perguntas da atividade antes de concluir a aula.')
+    throw error
+  }
   return data as { done: number; total: number; course_completed: boolean }
+}
+
+export interface ActivityAnswerResult {
+  correct: boolean[]
+  passed: boolean
+  explanations?: (string | null)[]
+}
+
+/**
+ * Corrige a atividade no servidor (o aluno não recebe o gabarito) e, se tudo estiver certo, registra a
+ * aprovação exigida pelo complete_lesson. Devolve null quando a RPC ainda não existe no banco.
+ */
+export async function answerLessonActivity(courseId: string, moduleIndex: number, lessonIndex: number, answers: number[]): Promise<ActivityAnswerResult | null> {
+  const { data, error } = await supabase.rpc('answer_lesson_activity', {
+    p_course_id: courseId,
+    p_module_index: moduleIndex,
+    p_lesson_index: lessonIndex,
+    p_answers: answers,
+  })
+  if (error) {
+    if (isMissingRpc(error)) return null
+    throw error
+  }
+  const result = data as { corretas: boolean[]; aprovado: boolean; explicacoes: (string | null)[] | null }
+  return { correct: result.corretas ?? [], passed: !!result.aprovado, explanations: result.explicacoes ?? undefined }
 }
 
 export async function submitActivity(activityId: string, answer: string, url?: string) {
@@ -68,7 +96,7 @@ export async function acceptMentorInvites(): Promise<string | null> {
 }
 
 /**
- * Desvincula um mentor da empresa logada (tira o company_id e os vínculos com os treinamentos dela),
+ * Desvincula um mentor da empresa logada (tira o empresa_id e os vínculos com os treinamentos dela),
  * preservando a conta, o histórico de sessões e as atividades. Antes o app apagava a linha do mentor.
  */
 export async function unlinkCompanyMentor(mentorId: string) {

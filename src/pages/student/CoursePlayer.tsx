@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, ArrowRight, Award, CheckCircle2, Circle, MessageCircle, PlayCircle } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Award, BookOpen, CheckCircle2, Circle, MessageCircle, PlayCircle, Video } from 'lucide-react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { StudentSidebar } from '../../components/layout/StudentSidebar'
 import { Card } from '../../components/ui/Card'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { Modal } from '../../components/ui/Modal'
+import { LessonMaterial } from '../../components/course/LessonMaterial'
+import { LessonVideo } from '../../components/course/LessonVideo'
+import { LessonActivity } from '../../components/course/LessonActivity'
+import { ReadSentinel } from '../../components/course/ReadSentinel'
+import { parseVideoSource } from '../../lib/video'
 import { useAuthStore } from '../../store/authStore'
 import { useCurrentStudent, useDataStore } from '../../store/dataStore'
 import { canStudentAccessCourse } from '../../lib/access'
@@ -30,9 +35,14 @@ export default function CoursePlayer() {
   const lessonProgress = useDataStore((s) => s.lessonProgress)
   const certificates = useDataStore((s) => s.certificates)
   const completeLesson = useDataStore((s) => s.completeLesson)
+  const answerActivity = useDataStore((s) => s.answerActivity)
+  const activityPasses = useDataStore((s) => s.activityPasses)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [finished, setFinished] = useState(false)
+  // O que o aluno já cumpriu em cada aula nesta visita ("módulo-aula" → leu o material, assistiu ao
+  // vídeo inteiro, acertou a atividade) e quanto do vídeo já viu.
+  const [checks, setChecks] = useState<Record<string, LessonChecks>>({})
 
   if (!student) return null
 
@@ -84,6 +94,27 @@ export default function CoursePlayer() {
   const prev = lessons[currentPos - 1]
   const next = lessons[currentPos + 1]
   const currentDone = progress.isLessonDone(current)
+  const content = course.modules[current.moduleIndex]?.contents?.[current.lessonIndex]
+  const hasVideo = !!parseVideoSource(content?.videoUrl)
+  // Verificação antes de concluir: assistir ao vídeo inteiro, ler o material até o fim e acertar a
+  // atividade (o que a aula tiver). A atividade é corrigida e registrada no servidor.
+  const lessonKey = `${current.moduleIndex}-${current.lessonIndex}`
+  const lessonChecks = checks[lessonKey] ?? {}
+  const activityPass = activityPasses.find(
+    (p) => p.studentId === student.id && p.courseId === course.id && p.moduleIndex === current.moduleIndex && p.lessonIndex === current.lessonIndex
+  )
+  const needsVideo = hasVideo
+  const needsRead = !!content?.material
+  const needsActivity = !!content?.activity?.length
+  const activityOk = !!activityPass || !!lessonChecks.activity
+  const pendingChecks = [
+    needsVideo && !lessonChecks.video ? 'assistir ao vídeo inteiro' : null,
+    needsRead && !lessonChecks.read ? 'ler o material até o fim' : null,
+    needsActivity && !activityOk ? 'acertar todas as perguntas da atividade' : null,
+  ].filter((c): c is string => !!c)
+  const canComplete = pendingChecks.length === 0
+  const markCheck = (key: string, patch: LessonChecks) => setChecks((c) => ({ ...c, [key]: { ...c[key], ...patch } }))
+  const videoStorageKey = `sb-video:${student.id}:${course.id}:${lessonKey}:${content?.videoUrl ?? ''}`
   const certificate = certificates.find((c) => c.studentId === student.id && c.courseId === course.id)
   // Concluir esta aula fecha o curso? Só se ela for a única que falta — na última aula com outras pendentes
   // o botão dizia "Concluir curso" e nada acontecia.
@@ -96,6 +127,7 @@ export default function CoursePlayer() {
   }
 
   const handleComplete = async () => {
+    if (!canComplete) return
     setSaving(true)
     setError(null)
     try {
@@ -127,13 +159,27 @@ export default function CoursePlayer() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Card padding="none" className="overflow-hidden">
-            <div className="flex aspect-video flex-col items-center justify-center bg-gradient-to-br from-primary-800 to-primary-600 px-6 text-center text-white">
-              <PlayCircle size={56} strokeWidth={1.5} className="opacity-90" />
-              <p className="mt-4 text-xs font-bold uppercase tracking-wide text-primary-100">
-                Módulo {current.moduleIndex + 1} · {current.moduleTitle}
-              </p>
-              <p className="mt-1 text-lg font-bold sm:text-xl">{current.title}</p>
-            </div>
+            {hasVideo ? (
+              <LessonVideo
+                key={videoStorageKey}
+                url={content!.videoUrl!}
+                title={current.title}
+                credit={content?.videoCredit}
+                storageKey={videoStorageKey}
+                locked={!currentDone}
+                onProgress={(percent) => markCheck(lessonKey, { videoPercent: percent })}
+                onWatched={() => markCheck(lessonKey, { video: true, videoPercent: 100 })}
+              />
+            ) : (
+              // Aula só de leitura: faixa com o título, sem um botão de play que não toca nada.
+              <div className="flex flex-col items-center justify-center bg-gradient-to-br from-primary-800 to-primary-600 px-6 py-10 text-center text-white">
+                <BookOpen size={40} strokeWidth={1.5} className="opacity-90" />
+                <p className="mt-3 text-xs font-bold uppercase tracking-wide text-primary-100">
+                  Módulo {current.moduleIndex + 1} · {current.moduleTitle}
+                </p>
+                <p className="mt-1 text-lg font-bold sm:text-xl">{current.title}</p>
+              </div>
+            )}
 
             <div className="p-6">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -147,10 +193,51 @@ export default function CoursePlayer() {
                 )}
               </div>
               <h1 className="mt-2 text-xl font-extrabold text-slate-900 dark:text-slate-50 sm:text-2xl">{current.title}</h1>
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Estude o material desta aula com {course.instructor} e marque como concluída para avançar. Ao concluir todas as aulas, seu certificado é
-                emitido automaticamente.
-              </p>
+              {content?.material ? (
+                <div className="mt-4">
+                  <LessonMaterial text={content.material} />
+                  {!currentDone && <ReadSentinel key={lessonKey} onSeen={() => markCheck(lessonKey, { read: true })} />}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                  Estude o material desta aula com {course.instructor} e marque como concluída para avançar. Ao concluir todas as aulas, seu certificado
+                  é emitido automaticamente.
+                </p>
+              )}
+
+              {needsActivity && (
+                <LessonActivity
+                  key={`${lessonKey}-${activityOk ? 'ok' : 'pendente'}`}
+                  questions={content!.activity!}
+                  passed={activityOk}
+                  passedAnswers={activityPass?.answers}
+                  onSubmit={(answers) => answerActivity(course.id, current.moduleIndex, current.lessonIndex, answers)}
+                  onPass={() => markCheck(lessonKey, { activity: true })}
+                />
+              )}
+
+              {!currentDone && (needsVideo || needsRead || needsActivity) && (
+                <div className="mt-6 rounded-xl bg-slate-50 px-4 py-3 dark:bg-slate-900/40" aria-live="polite">
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Para concluir esta aula</p>
+                  <ul className="mt-2 space-y-1.5 text-sm">
+                    {needsVideo && (
+                      <ChecklistItem
+                        done={!!lessonChecks.video}
+                        label={lessonChecks.video ? 'Assistir ao vídeo inteiro' : `Assistir ao vídeo inteiro (${lessonChecks.videoPercent ?? 0}% assistido)`}
+                      />
+                    )}
+                    {needsRead && (
+                      <ChecklistItem done={!!lessonChecks.read} label="Ler o material até o fim" />
+                    )}
+                    {needsActivity && (
+                      <ChecklistItem
+                        done={!!lessonChecks.activity}
+                        label={`Acertar a atividade (${content!.activity!.length} ${content!.activity!.length === 1 ? 'pergunta' : 'perguntas'})`}
+                      />
+                    )}
+                  </ul>
+                </div>
+              )}
 
               {error && (
                 <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-600 dark:bg-red-500/10 dark:text-red-400">{error}</p>
@@ -175,9 +262,21 @@ export default function CoursePlayer() {
                     </Button>
                   )
                 ) : (
-                  <Button iconRight={isLastPending ? <Award size={16} /> : <ArrowRight size={16} />} disabled={saving} onClick={handleComplete}>
-                    {saving ? 'Salvando...' : isLastPending ? 'Concluir curso' : next ? 'Concluir e avançar' : 'Concluir aula'}
-                  </Button>
+                  <div className="flex flex-col items-stretch gap-1.5 sm:items-end">
+                    <Button
+                      iconRight={isLastPending ? <Award size={16} /> : <ArrowRight size={16} />}
+                      disabled={saving || !canComplete}
+                      onClick={handleComplete}
+                      aria-describedby={canComplete ? undefined : 'pendencias-aula'}
+                    >
+                      {saving ? 'Salvando...' : isLastPending ? 'Concluir curso' : next ? 'Concluir e avançar' : 'Concluir aula'}
+                    </Button>
+                    {!canComplete && (
+                      <p id="pendencias-aula" className="text-xs text-slate-400 sm:text-right">
+                        Falta {pendingChecks.join(' e ')}.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -223,7 +322,10 @@ export default function CoursePlayer() {
                           ) : (
                             <Circle size={16} className="mt-0.5 shrink-0 text-slate-300 dark:text-slate-600" />
                           )}
-                          <span>{title}</span>
+                          <span className="flex-1">{title}</span>
+                          {parseVideoSource(mod.contents?.[lessonIndex]?.videoUrl) && (
+                            <Video size={14} className="mt-0.5 shrink-0 text-slate-400" aria-label="Aula com vídeo" />
+                          )}
                         </button>
                       </li>
                     )
@@ -267,4 +369,22 @@ export default function CoursePlayer() {
       </Modal>
     </DashboardLayout>
   )
+}
+
+function ChecklistItem({ done, label }: { done: boolean; label: string }) {
+  return (
+    <li className={cn('flex items-center gap-2', done ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-600 dark:text-slate-300')}>
+      {done ? <CheckCircle2 size={16} className="shrink-0" /> : <Circle size={16} className="shrink-0 text-slate-300 dark:text-slate-600" />}
+      <span>{label}</span>
+      <span className="sr-only">{done ? '(feito)' : '(pendente)'}</span>
+    </li>
+  )
+}
+
+interface LessonChecks {
+  read?: boolean
+  video?: boolean
+  videoPercent?: number
+  /** Aprovação local (só quando a correção no servidor ainda não existe). */
+  activity?: boolean
 }

@@ -3,6 +3,7 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabaseClient'
 import type {
   ActivityItem,
+  ActivityPass,
   Availability,
   Certificate,
   Company,
@@ -25,7 +26,8 @@ import { fetchCompanies, updateCompanyRow } from '../lib/supabase/queries/compan
 import { fetchCourses, insertCourseRow, updateCourseRow, deleteCourseRow } from '../lib/supabase/queries/courses'
 import { fetchPrograms, insertProgramRow, updateProgramRow, setProgramStudentsRows } from '../lib/supabase/queries/programs'
 import { fetchJobs, fetchJobApplications, insertJobRow, updateJobRow, deleteJobRow } from '../lib/supabase/queries/jobs'
-import { fetchLessonProgress } from '../lib/supabase/queries/progress'
+import { fetchActivityPasses, fetchLessonProgress } from '../lib/supabase/queries/progress'
+import { gradeActivity, hasAnswerKey, type ActivityResult } from '../lib/activity'
 import {
   fetchEnrollmentRequests,
   updateEnrollmentRequestStatus,
@@ -43,6 +45,7 @@ import {
   enrollInCourse as enrollInCourseRequest,
   applyToJob as applyToJobRequest,
   completeLesson as completeLessonRequest,
+  answerLessonActivity,
   submitActivity as submitActivityRequest,
   cancelMentorSession,
   reviewMentorSession,
@@ -63,6 +66,7 @@ interface DataState {
   jobs: Job[]
   jobApplications: JobApplication[]
   lessonProgress: LessonProgress[]
+  activityPasses: ActivityPass[]
   enrollmentRequests: EnrollmentRequest[]
   mentorInvites: MentorInvite[]
   mentorSessions: MentorSession[]
@@ -93,6 +97,8 @@ interface DataState {
   enrollInCourse: (courseId: string) => Promise<void>
   /** Marca a aula como concluída. `courseCompleted` = essa foi a última aula e o certificado foi emitido. */
   completeLesson: (courseId: string, moduleIndex: number, lessonIndex: number) => Promise<{ courseCompleted: boolean }>
+  /** Envia as respostas da atividade da aula para correção no servidor (o aluno não tem o gabarito). */
+  answerActivity: (courseId: string, moduleIndex: number, lessonIndex: number, answers: number[]) => Promise<ActivityResult>
 
   // -------- Mentores (Empresa + Mentor) -------------------------------------
   /** Cria o login do mentor já vinculado à empresa (Edge Function company-users). */
@@ -154,6 +160,7 @@ const fetchers = {
   jobs: fetchJobs,
   jobApplications: fetchJobApplications,
   lessonProgress: fetchLessonProgress,
+  activityPasses: fetchActivityPasses,
   enrollmentRequests: fetchEnrollmentRequests,
   mentorInvites: fetchMentorInvites,
   mentorSessions: fetchMentorSessions,
@@ -192,7 +199,7 @@ function syncAuthUser(fresh: Student | Company | undefined) {
   if (fresh && current && current.id === fresh.id && current.type === fresh.type) useAuthStore.setState({ user: fresh })
 }
 
-const MESSAGES_TOPIC_PREFIX = 'mentor-messages-'
+const MESSAGES_TOPIC_PREFIX = 'mensagem-mentoria-'
 let messagesChannel: RealtimeChannel | null = null
 /** Quem o canal atual escuta (`coluna:usuário`): evita recriar o canal a cada evento de sessão. */
 let messagesChannelKey: string | null = null
@@ -210,7 +217,7 @@ export function subscribeRealtime() {
     return
   }
 
-  const column = accountType === 'mentor' ? 'mentor_id' : 'student_id'
+  const column = accountType === 'mentor' ? 'mentor_id' : 'aluno_id'
   const key = `${column}:${user.id}`
   if (messagesChannel && messagesChannelKey === key) return
 
@@ -225,7 +232,7 @@ export function subscribeRealtime() {
       .channel(`${MESSAGES_TOPIC_PREFIX}${user.id}-${++channelSeq}-${Math.random().toString(36).slice(2, 8)}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'mentor_messages', filter: `${column}=eq.${user.id}` },
+        { event: 'INSERT', schema: 'public', table: 'mensagem_mentoria', filter: `${column}=eq.${user.id}` },
         () => void refetch(['mentorMessages'])
       )
       .subscribe()
@@ -260,6 +267,7 @@ export const useDataStore = create<DataState>((set) => ({
   jobs: [],
   jobApplications: [],
   lessonProgress: [],
+  activityPasses: [],
   enrollmentRequests: [],
   mentorInvites: [],
   mentorSessions: [],
@@ -305,6 +313,7 @@ export const useDataStore = create<DataState>((set) => ({
       jobs: [],
       jobApplications: [],
       lessonProgress: [],
+      activityPasses: [],
       enrollmentRequests: [],
       mentorInvites: [],
       mentorSessions: [],
@@ -369,6 +378,20 @@ export const useDataStore = create<DataState>((set) => ({
     return { courseCompleted: result.course_completed }
   },
 
+  answerActivity: async (courseId, moduleIndex, lessonIndex, answers): Promise<ActivityResult> => {
+    const result = await answerLessonActivity(courseId, moduleIndex, lessonIndex, answers)
+    if (result) {
+      if (result.passed) await refetch(['activityPasses'])
+      return result
+    }
+    // RPC ainda não publicada: só dá para corrigir no navegador se o gabarito vier junto (formato antigo).
+    const courses: Course[] = useDataStore.getState().courses
+    const course = courses.find((c) => c.id === courseId)
+    const questions = course?.modules[moduleIndex]?.contents?.[lessonIndex]?.activity ?? []
+    if (!hasAnswerKey(questions)) throw userError('A correção das atividades depende de uma atualização no servidor que ainda não foi aplicada.')
+    return gradeActivity(questions, answers)
+  },
+
   addMentorDirect: async (input) => {
     await callCompanyUsers({ action: 'create_mentor', ...input })
     await refetch(['mentors', 'programs', 'mentorInvites'])
@@ -385,7 +408,7 @@ export const useDataStore = create<DataState>((set) => ({
   },
 
   removeMentor: async (mentorId) => {
-    // Desvincula da empresa em vez de apagar: o DELETE em `mentors` excluía a conta do mentor e, em
+    // Desvincula da empresa em vez de apagar: o DELETE em `mentor` excluía a conta do mentor e, em
     // cascata, horários, sessões (inclusive o histórico dos alunos), atividades e mensagens.
     await unlinkCompanyMentor(mentorId)
     await refetch(['mentors', 'programs'])
