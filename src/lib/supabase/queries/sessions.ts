@@ -51,12 +51,12 @@ interface CertificateRow {
   aluno_id: string
   curso_id: string | null
   emitido_em: string
-  // Colunas de "retrato" do curso: só existem depois do SQL de certificados (ainda não aplicado; os nomes
-  // abaixo são os do rascunho em inglês). `select('*')` funciona com ou sem elas.
-  course_title?: string | null
-  course_hours?: number | null
-  instructor?: string | null
-  company_name?: string | null
+  // Colunas de "retrato" do curso: só existem depois do SQL pendente (seção 4). `select('*')` funciona
+  // com ou sem elas.
+  titulo_curso?: string | null
+  carga_horaria_curso?: number | null
+  instrutor_curso?: string | null
+  nome_empresa?: string | null
 }
 
 function toCertificate(row: CertificateRow): Certificate {
@@ -65,10 +65,10 @@ function toCertificate(row: CertificateRow): Certificate {
     studentId: row.aluno_id,
     courseId: row.curso_id ?? '',
     issuedAt: row.emitido_em.slice(0, 10),
-    courseTitle: row.course_title ?? undefined,
-    courseHours: row.course_hours ?? undefined,
-    instructor: row.instructor ?? undefined,
-    companyName: row.company_name ?? undefined,
+    courseTitle: row.titulo_curso ?? undefined,
+    courseHours: row.carga_horaria_curso ?? undefined,
+    instructor: row.instrutor_curso ?? undefined,
+    companyName: row.nome_empresa ?? undefined,
   }
 }
 
