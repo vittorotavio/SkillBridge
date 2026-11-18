@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { X, type LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
-import logo from '../../assets/logo.svg'
+import { BrandLink } from './BrandLink'
 import { useMobileNav } from './mobileNav'
 
 export interface SidebarItem {
@@ -27,12 +27,11 @@ export function Sidebar({ items, footer }: { items: SidebarItem[]; footer?: Reac
       )}
     >
       <div className="flex h-16 shrink-0 items-center gap-2 border-b border-slate-100 px-6 dark:border-slate-800">
-        <img src={logo} alt="" className="h-9 w-auto" />
-        <span className="flex-1 text-lg font-extrabold text-slate-900 dark:text-slate-50">SkillBridge</span>
+        <BrandLink onClick={() => setOpen(false)} />
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 lg:hidden dark:hover:bg-slate-800"
+          className="ml-auto rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 lg:hidden dark:hover:bg-slate-800"
           aria-label="Fechar menu"
         >
           <X size={20} />

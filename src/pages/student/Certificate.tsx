@@ -5,7 +5,7 @@ import { EmptyState } from '../../components/ui/EmptyState'
 import { useAuthStore } from '../../store/authStore'
 import { useCurrentStudent, useDataStore } from '../../store/dataStore'
 import { formatDateBR } from '../../lib/date'
-import logo from '../../assets/logo.svg'
+import { BrandLink } from '../../components/layout/BrandLink'
 
 /**
  * Certificado de conclusão em página própria (sem sidebar), pensado para
@@ -55,10 +55,8 @@ export default function Certificate() {
       ) : (
         <div className="mx-auto max-w-4xl sm:aspect-[1.414] bg-white p-3 text-slate-900 shadow-card print:max-w-none print:shadow-none">
           <div className="flex h-full flex-col items-center justify-between gap-8 rounded-lg border-4 border-double border-primary-300 px-6 py-10 text-center sm:px-10">
-            <div className="flex items-center gap-2">
-              <img src={logo} alt="" className="h-9 w-auto" />
-              <span className="text-lg font-extrabold">SkillBridge</span>
-            </div>
+            {/* O documento é sempre claro: o nome não acompanha o tema escuro. */}
+            <BrandLink textClassName="dark:text-slate-900" />
 
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary-500">Certificado de conclusão</p>

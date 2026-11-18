@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { AtSign, Check, MessageCircle, Rss, Share2 } from 'lucide-react'
-import logo from '../../assets/logo.svg'
+import { BrandLink } from './BrandLink'
 
 const columns = [
   {
@@ -74,10 +74,7 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-6 py-12">
         <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-5">
           <div className="lg:col-span-2">
-            <div className="flex items-center gap-2">
-              <img src={logo} alt="" className="h-9 w-auto" />
-              <span className="text-lg font-extrabold text-slate-900 dark:text-slate-50">SkillBridge</span>
-            </div>
+            <BrandLink />
             <p className="mt-3 max-w-xs text-sm text-slate-500 dark:text-slate-400">
               A ponte entre aprendizado, mentoria e oportunidades reais de carreira — para pessoas e empresas.
             </p>

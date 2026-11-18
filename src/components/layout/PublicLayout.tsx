@@ -1,24 +1,32 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
-import { Menu, X } from 'lucide-react'
+import { Link, useLocation } from 'react-router-dom'
+import { LayoutDashboard, Menu, X } from 'lucide-react'
 import { useState } from 'react'
 import { Footer } from './Footer'
+import { BrandLink } from './BrandLink'
 import { ButtonLink } from '../ui/Button'
 import { ThemeToggle } from '../ui/ThemeToggle'
-import logo from '../../assets/logo.svg'
+import { useAuthStore } from '../../store/authStore'
+import { homePathFor } from '../../lib/routes'
+import { RESET_PASSWORD_PATH } from '../../lib/supabase/passwordRecovery'
+import { cn } from '../../lib/cn'
 
 /** Layout para telas públicas/institucionais (Landing, Login, Cadastro). Sempre fecha com Footer. */
 export function PublicLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
+  const { pathname } = useLocation()
+  const sessionLoading = useAuthStore((s) => s.loading)
+  const accountType = useAuthStore((s) => s.accountType)
+  // Quem já entrou vê um botão de volta ao próprio painel no lugar de "Entrar"/"Criar conta". Na troca
+  // de senha pelo link do e-mail a sessão serve só para isso (no fim a tela desconecta), então ali o
+  // cabeçalho continua o de visitante.
+  const panelPath = accountType && pathname !== RESET_PASSWORD_PATH ? homePathFor(accountType) : null
 
   return (
     <div className="flex min-h-screen flex-col bg-surface">
       <header className="sticky top-0 z-30 border-b border-primary-100/70 bg-surface/90 backdrop-blur dark:border-slate-800">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-          <Link to="/" className="flex items-center gap-2">
-            <img src={logo} alt="" className="h-9 w-auto" />
-            <span className="text-lg font-extrabold text-slate-900 dark:text-slate-50">SkillBridge</span>
-          </Link>
+          <BrandLink />
 
           <nav className="hidden items-center gap-8 md:flex">
             <Link to="/#cursos" className="text-sm font-semibold text-slate-600 hover:text-primary-700 dark:text-slate-300 dark:hover:text-primary-300">
@@ -37,12 +45,22 @@ export function PublicLayout({ children }: { children: ReactNode }) {
 
           <div className="hidden items-center gap-2 md:flex">
             <ThemeToggle />
-            <ButtonLink to="/login" variant="ghost" size="sm">
-                Entrar
+            {panelPath ? (
+              <ButtonLink to={panelPath} variant="cta" size="sm" icon={<LayoutDashboard size={16} />}>
+                Voltar ao painel
               </ButtonLink>
-            <ButtonLink to="/cadastro" variant="cta" size="sm">
-                Criar conta grátis
-              </ButtonLink>
+            ) : (
+              // Enquanto a sessão é restaurada (F5), os botões de visitante ocupam o lugar sem aparecer:
+              // assim quem está logado não vê "Entrar" piscar antes do botão do painel.
+              <div className={cn('flex items-center gap-2', sessionLoading && 'invisible')}>
+                <ButtonLink to="/login" variant="ghost" size="sm">
+                  Entrar
+                </ButtonLink>
+                <ButtonLink to="/cadastro" variant="cta" size="sm">
+                  Criar conta grátis
+                </ButtonLink>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-1 md:hidden">
@@ -67,14 +85,22 @@ export function PublicLayout({ children }: { children: ReactNode }) {
             <Link to="/#depoimentos" onClick={() => setOpen(false)} className="block py-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
               Depoimentos
             </Link>
-            <div className="mt-3 flex gap-3">
-              <ButtonLink to="/login" className="flex-1" variant="secondary" size="sm" fullWidth>
+            {panelPath ? (
+              <div className="mt-3">
+                <ButtonLink to={panelPath} variant="cta" size="sm" fullWidth icon={<LayoutDashboard size={16} />}>
+                  Voltar ao painel
+                </ButtonLink>
+              </div>
+            ) : (
+              <div className="mt-3 flex gap-3">
+                <ButtonLink to="/login" className="flex-1" variant="secondary" size="sm" fullWidth>
                   Entrar
                 </ButtonLink>
-              <ButtonLink to="/cadastro" className="flex-1" variant="cta" size="sm" fullWidth>
+                <ButtonLink to="/cadastro" className="flex-1" variant="cta" size="sm" fullWidth>
                   Criar conta
                 </ButtonLink>
-            </div>
+              </div>
+            )}
           </div>
         )}
       </header>
