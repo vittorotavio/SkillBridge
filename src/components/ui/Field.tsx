@@ -42,7 +42,7 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
 export function Textarea({ label, hint, error, className, required, ...props }: TextareaProps) {
   return (
     <Wrapper label={label} hint={hint} error={error} required={required}>
-      <textarea className={cn(fieldBase, 'min-h-[100px] resize-y', error && 'border-red-300', className)} required={required} {...props} />
+      <textarea className={cn(fieldBase, 'min-h-[100px]', error && 'border-red-300', className)} required={required} {...props} />
     </Wrapper>
   )
 }
