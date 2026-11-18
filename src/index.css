@@ -16,6 +16,15 @@ html {
   scroll-behavior: smooth;
 }
 
+@layer base {
+  /* Caixas de texto com tamanho fixo (sem a alça de redimensionar do canto): o texto que passa da
+     altura rola com a barra lateral. Vale para toda textarea, inclusive as que não usam <Textarea>. */
+  textarea {
+    resize: none;
+    overflow-y: auto;
+  }
+}
+
 body {
   @apply bg-surface text-slate-800 antialiased transition-colors duration-150 dark:text-slate-100;
   font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
