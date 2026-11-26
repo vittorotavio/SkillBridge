@@ -53,6 +53,8 @@ import {
   releasePastSessionSlots,
 } from '../lib/supabase/rpc'
 import { callCompanyUsers } from '../lib/supabase/companyUsers'
+import { deleteProfileImage, uploadProfileImage } from '../lib/supabase/storage'
+import type { PhotoDraft, ProfileImageKind } from '../lib/profileImage'
 import { nextDateForWeekday } from '../lib/date'
 import { friendlyError, userError } from '../lib/errors'
 import { useAuthStore } from './authStore'
@@ -88,7 +90,8 @@ interface DataState {
   inviteStudentByEmail: (programId: string, email: string) => Promise<void>
 
   // -------- Perfil do aluno ----------------------------------------------------
-  updateStudentProfile: (studentId: string, patch: { name?: string; bio?: string }) => Promise<void>
+  /** `photo`: troca/remoção da foto de perfil, gravada junto com o resto (ver saveWithPhoto). */
+  updateStudentProfile: (studentId: string, patch: { name?: string; bio?: string }, photo?: PhotoDraft) => Promise<void>
 
   // -------- Cursos (Empresa + Aluno) ---------------------------------------
   addCourse: (course: Omit<Course, 'id' | 'enrolledCount' | 'rating'>) => Promise<void>
@@ -107,7 +110,7 @@ interface DataState {
   resendMentorInvite: (inviteId: string) => Promise<void>
   removeMentor: (mentorId: string) => Promise<void>
   removeMentorInvite: (inviteId: string) => Promise<void>
-  updateMentorProfile: (mentorId: string, patch: { bio?: string; pricePerSession?: number; skills?: string[] }) => Promise<void>
+  updateMentorProfile: (mentorId: string, patch: { bio?: string; pricePerSession?: number; skills?: string[] }, photo?: PhotoDraft) => Promise<void>
 
   // -------- Treinamentos (Empresa) -----------------------------------------
   /** Devolve o id do treinamento criado. */
@@ -123,9 +126,11 @@ interface DataState {
   applyToJob: (jobId: string) => Promise<void>
 
   // -------- Empresa (Configurações) -----------------------------------------
+  /** `logo`: troca/remoção do logo (enviado ao Storage), gravada junto com o resto. */
   updateCompanyProfile: (
     companyId: string,
-    patch: Partial<{ name: string; razaoSocial: string; sector: string; email: string; logoUrl: string }>
+    patch: Partial<{ name: string; razaoSocial: string; sector: string; email: string }>,
+    logo?: PhotoDraft
   ) => Promise<void>
   /** Cria o login de outro administrador da empresa logada (Edge Function company-users). */
   addCompanyAdmin: (input: { name: string; email: string; password: string; role: string }) => Promise<void>
@@ -194,9 +199,32 @@ async function refetch(keys: SliceKey[]) {
  * O usuário logado (authStore) é uma cópia carregada no login: depois de editar o próprio
  * perfil, atualiza essa cópia também, senão topo e telas que leem dela mostram o dado antigo.
  */
-function syncAuthUser(fresh: Student | Company | undefined) {
+function syncAuthUser(fresh: Student | Mentor | Company | undefined) {
   const current = useAuthStore.getState().user
   if (fresh && current && current.id === fresh.id && current.type === fresh.type) useAuthStore.setState({ user: fresh })
+}
+
+/**
+ * Grava o perfil junto com a troca de foto/logo. A imagem nova sobe antes (o UPDATE já leva a URL
+ * dela) e a antiga só é apagada do Storage depois que o perfil foi gravado. Se gravar falhar, a
+ * recém-enviada é apagada, para não sobrar arquivo sem dono. `save` recebe a URL a gravar:
+ * undefined = foto não mudou, null = foto removida.
+ */
+async function saveWithPhoto(
+  photo: PhotoDraft | undefined,
+  target: { kind: ProfileImageKind; folder: string; currentUrl: string | undefined },
+  save: (photoUrl: string | null | undefined) => Promise<void>
+) {
+  let photoUrl: string | null | undefined
+  if (photo?.kind === 'new') photoUrl = await uploadProfileImage(target.folder, target.kind, photo.image)
+  else if (photo?.kind === 'remove') photoUrl = null
+  try {
+    await save(photoUrl)
+  } catch (err) {
+    if (photo?.kind === 'new' && photoUrl) void deleteProfileImage(photoUrl)
+    throw err
+  }
+  if (photoUrl !== undefined && target.currentUrl && target.currentUrl !== photoUrl) void deleteProfileImage(target.currentUrl)
 }
 
 const MESSAGES_TOPIC_PREFIX = 'mensagem-mentoria-'
@@ -346,8 +374,11 @@ export const useDataStore = create<DataState>((set) => ({
     await refetch(['enrollmentRequests', 'students', 'programs'])
   },
 
-  updateStudentProfile: async (studentId, patch) => {
-    await updateStudentRow(studentId, patch)
+  updateStudentProfile: async (studentId, patch, photo) => {
+    const currentUrl = useDataStore.getState().students.find((s) => s.id === studentId)?.avatarUrl
+    await saveWithPhoto(photo, { kind: 'avatar', folder: studentId, currentUrl }, (avatarUrl) =>
+      updateStudentRow(studentId, avatarUrl === undefined ? patch : { ...patch, avatarUrl })
+    )
     await refetch(['students'])
     syncAuthUser(useDataStore.getState().students.find((s) => s.id === studentId))
   },
@@ -419,9 +450,14 @@ export const useDataStore = create<DataState>((set) => ({
     await refetch(['mentorInvites'])
   },
 
-  updateMentorProfile: async (mentorId, patch) => {
-    await updateMentorRow(mentorId, patch)
+  updateMentorProfile: async (mentorId, patch, photo) => {
+    const currentUrl = useDataStore.getState().mentors.find((m) => m.id === mentorId)?.avatarUrl
+    await saveWithPhoto(photo, { kind: 'avatar', folder: mentorId, currentUrl }, (avatarUrl) =>
+      updateMentorRow(mentorId, avatarUrl === undefined ? patch : { ...patch, avatarUrl })
+    )
     await refetch(['mentors'])
+    // O topo do painel lê a cópia do login: sem isso a foto nova só aparecia depois de um F5.
+    syncAuthUser(useDataStore.getState().mentors.find((m) => m.id === mentorId))
   },
 
   addProgram: async (program) => {
@@ -467,8 +503,13 @@ export const useDataStore = create<DataState>((set) => ({
     await refetch(['jobs', 'jobApplications'])
   },
 
-  updateCompanyProfile: async (companyId, patch) => {
-    await updateCompanyRow(companyId, patch)
+  updateCompanyProfile: async (companyId, patch, logo) => {
+    const known = useDataStore.getState().companies.find((c) => c.id === companyId)
+    const logged = useAuthStore.getState().user
+    const currentUrl = known?.logoUrl ?? (logged?.type === 'company' && logged.id === companyId ? logged.logoUrl : undefined)
+    await saveWithPhoto(logo, { kind: 'logo', folder: companyId, currentUrl }, (logoUrl) =>
+      updateCompanyRow(companyId, logoUrl === undefined ? patch : { ...patch, logoUrl })
+    )
     await refetch(['companies'])
     syncAuthUser(useDataStore.getState().companies.find((c) => c.id === companyId))
   },

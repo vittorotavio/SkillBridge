@@ -116,7 +116,7 @@ export default function MentorActivities() {
           return (
             <Card key={studentId}>
               <div className="flex items-center gap-3">
-                <Avatar name={student?.name ?? '?'} size="lg" />
+                <Avatar name={student?.name ?? '?'} src={student?.avatarUrl} size="lg" />
                 <div>
                   <p className="font-bold text-slate-800 dark:text-slate-100">{student?.name}</p>
                   <p className="text-xs text-slate-400">{student?.email}</p>

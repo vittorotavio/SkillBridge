@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/authStore'
 import { useDataStore } from '../../store/dataStore'
 import { getUnreadMessages, senderNameFor, threadLinkFor } from '../../lib/notifications'
 import { formatDateTimeBR } from '../../lib/date'
+import { profilePhotoOf } from '../../lib/profileImage'
 import { useMobileNav } from './mobileNav'
 
 const accountTypeLabel = { student: 'Aluno', mentor: 'Mentor', company: 'Empresa' } as const
@@ -131,7 +132,7 @@ export function Topbar({ profileTitle }: { profileTitle: string }) {
             aria-label="Menu da conta"
             aria-expanded={menuOpen}
           >
-            <Avatar name={user?.name ?? '?'} size="sm" />
+            <Avatar name={user?.name ?? '?'} src={profilePhotoOf(user)} fit={user?.type === 'company' ? 'contain' : 'cover'} size="sm" />
             <span className="hidden text-left sm:block">
               <span className="block text-sm font-semibold leading-tight text-slate-800 dark:text-slate-100">{user?.name}</span>
               <span className="block text-xs leading-tight text-slate-400">{accountType && accountTypeLabel[accountType]}</span>

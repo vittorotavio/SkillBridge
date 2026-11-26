@@ -62,7 +62,7 @@ export async function insertCompanyAdminRow(id: string, companyId: string, name:
 
 export async function updateCompanyRow(
   id: string,
-  patch: Partial<{ name: string; razaoSocial: string; sector: string; email: string; logoUrl: string }>
+  patch: Partial<{ name: string; razaoSocial: string; sector: string; email: string; logoUrl: string | null }>
 ) {
   const fields: Record<string, unknown> = {}
   if (patch.name !== undefined) fields.nome = patch.name

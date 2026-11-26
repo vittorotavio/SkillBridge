@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { parseVideoSource } from '../../lib/video'
+import { parseVideoSource, YOUTUBE_CAPTION_VARS } from '../../lib/video'
 import { advanceWatch, isFullyWatched, isSkippingAhead, watchedPercent, type WatchState } from '../../lib/watch'
 
 interface LessonVideoProps {
@@ -130,7 +130,7 @@ interface YouTubeApi {
       host?: string
       width?: string
       height?: string
-      playerVars?: Record<string, number>
+      playerVars?: Record<string, number | string>
       events?: { onStateChange?: (e: { data: number }) => void; onError?: () => void }
     }
   ) => YouTubePlayer
@@ -182,7 +182,7 @@ function YouTubeVideo({ id, title, tracker }: { id: string; title: string; track
           host: 'https://www.youtube-nocookie.com',
           width: '100%',
           height: '100%',
-          playerVars: { rel: 0, playsinline: 1, start: Math.floor(tracker.startAt) },
+          playerVars: { rel: 0, playsinline: 1, start: Math.floor(tracker.startAt), ...YOUTUBE_CAPTION_VARS },
           events: {
             onStateChange: (e) => {
               if (e.data === YT.PlayerState.ENDED) tracker.onEnded(created.getDuration())

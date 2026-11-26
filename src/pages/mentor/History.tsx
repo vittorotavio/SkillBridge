@@ -33,7 +33,7 @@ export default function MentorHistory() {
             <Card key={session.id}>
               <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
                 <div className="flex items-center gap-3">
-                  <Avatar name={student?.name ?? '?'} />
+                  <Avatar name={student?.name ?? '?'} src={student?.avatarUrl} />
                   <div>
                     <p className="font-bold text-slate-800 dark:text-slate-100">{student?.name}</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">{session.topic}</p>

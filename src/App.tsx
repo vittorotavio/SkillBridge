@@ -3,6 +3,9 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { INFO_PAGES } from './pages/institutional/infoPages'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { isRecoverySession, onPasswordRecovery, RESET_PASSWORD_PATH } from './lib/supabase/passwordRecovery'
+import { initialAuthRedirect } from './lib/supabaseClient'
+import { PROFILE_SETUP_PATH } from './lib/profileSetup'
+import { useAuthStore } from './store/authStore'
 
 // Cada tela vira um pedaço separado do bundle, baixado só quando a rota é aberta (antes tudo ia num
 // único arquivo de ~720 kB, acima do limite recomendado pelo Vite).
@@ -13,6 +16,7 @@ const RegisterStudentMentor = lazy(() => import('./pages/auth/RegisterStudentMen
 const RegisterCompany = lazy(() => import('./pages/auth/RegisterCompany'))
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'))
 const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'))
+const CompleteProfile = lazy(() => import('./pages/onboarding/CompleteProfile'))
 
 const StudentDashboard = lazy(() => import('./pages/student/Dashboard'))
 const ExploreCourses = lazy(() => import('./pages/student/ExploreCourses'))
@@ -71,10 +75,27 @@ function PasswordRecoveryRedirect() {
   return null
 }
 
+/**
+ * O link de confirmação do cadastro (e-mail) abre o site já logado, na página inicial. Conta nova
+ * segue direto para "Complete seu perfil" em vez de parar na vitrine; vale só para esse link.
+ */
+let signupConfirmationHandled = false
+function SignupConfirmationRedirect() {
+  const navigate = useNavigate()
+  const profileSetupPending = useAuthStore((s) => s.profileSetupPending)
+  useEffect(() => {
+    if (signupConfirmationHandled || !initialAuthRedirect.isSignup || !profileSetupPending) return
+    signupConfirmationHandled = true
+    if (window.location.pathname !== PROFILE_SETUP_PATH) navigate(PROFILE_SETUP_PATH, { replace: true })
+  }, [profileSetupPending, navigate])
+  return null
+}
+
 export default function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
       <PasswordRecoveryRedirect />
+      <SignupConfirmationRedirect />
       <Routes>
         <Route path="/" element={<Landing />} />
         {INFO_PAGES.map((slug) => (
@@ -85,6 +106,14 @@ export default function App() {
         <Route path="/cadastro/empresa" element={<RegisterCompany />} />
         <Route path="/esqueci-senha" element={<ForgotPassword />} />
         <Route path={RESET_PASSWORD_PATH} element={<ResetPassword />} />
+        <Route
+          path={PROFILE_SETUP_PATH}
+          element={
+            <ProtectedRoute allowPendingSetup>
+              <CompleteProfile />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Painel do Aluno */}
         <Route

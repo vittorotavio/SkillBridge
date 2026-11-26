@@ -409,7 +409,7 @@ export default function CoursesManagement() {
                                   <input
                                     className={fieldClass}
                                     aria-label={`Link do vídeo da aula ${lesson}`}
-                                    placeholder="Link do vídeo (YouTube ou arquivo .mp4/.webm). O aluno precisa assistir até o fim."
+                                    placeholder="Link do vídeo (YouTube, com legenda automática, ou arquivo .mp4/.webm). O aluno precisa assistir até o fim."
                                     value={c.videoUrl ?? ''}
                                     onChange={(e) => updateLessonContent(mod.id, lesson, { videoUrl: e.target.value })}
                                   />

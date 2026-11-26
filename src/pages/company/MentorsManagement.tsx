@@ -193,7 +193,7 @@ export default function MentorsManagement() {
                 <tr key={m.id}>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <Avatar name={m.name} size="sm" />
+                      <Avatar name={m.name} src={m.avatarUrl} size="sm" />
                       <div>
                         <p className="font-semibold text-slate-800 dark:text-slate-100">{m.name}</p>
                         <p className="text-xs text-slate-400">{m.email}</p>

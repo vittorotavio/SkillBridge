@@ -20,6 +20,8 @@ export default function CourseDetail() {
   const student = useCurrentStudent(authUser?.id)
   const course = useDataStore((s) => s.courses.find((c) => c.id === courseId))
   const companies = useDataStore((s) => s.companies)
+  // Instrutor que é mentor da plataforma: o card mostra a foto dele.
+  const instructorMentor = useDataStore((s) => (course?.instructorMentorId ? s.mentors.find((m) => m.id === course.instructorMentorId) : undefined))
   const enrollInCourse = useDataStore((s) => s.enrollInCourse)
   const lessonProgress = useDataStore((s) => s.lessonProgress)
   const certificates = useDataStore((s) => s.certificates)
@@ -199,7 +201,7 @@ export default function CourseDetail() {
           <Card>
             <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Instrutor</p>
             <div className="mt-3 flex items-center gap-3">
-              <Avatar name={course.instructor} />
+              <Avatar name={course.instructor} src={instructorMentor?.avatarUrl} />
               <div>
                 <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{course.instructor}</p>
                 <p className="text-xs text-slate-400">Instrutor(a) responsável</p>

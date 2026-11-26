@@ -180,7 +180,7 @@ export default function Mentorship() {
                 <Card key={mentor.id} hoverable className="flex flex-col">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <Avatar name={mentor.name} size="lg" />
+                      <Avatar name={mentor.name} src={mentor.avatarUrl} size="lg" />
                       <div>
                         <p className="font-bold text-slate-800 dark:text-slate-100">{mentor.name}</p>
                         <p className="flex items-center gap-1 text-xs text-slate-400">
@@ -309,7 +309,7 @@ export default function Mentorship() {
                 return (
                   <Card key={session.id} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                     <div className="flex items-center gap-3">
-                      <Avatar name={mentor?.name ?? '?'} />
+                      <Avatar name={mentor?.name ?? '?'} src={mentor?.avatarUrl} />
                       <div>
                         <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{mentor?.name ?? 'Mentor'}</p>
                         <p className="text-sm text-slate-500 dark:text-slate-400">{session.topic}</p>
@@ -356,7 +356,7 @@ export default function Mentorship() {
                   return (
                     <Card key={session.id} className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                       <div className="flex items-center gap-3">
-                        <Avatar name={mentor?.name ?? '?'} />
+                        <Avatar name={mentor?.name ?? '?'} src={mentor?.avatarUrl} />
                         <div>
                           <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{mentor?.name ?? 'Mentor'}</p>
                           <p className="text-sm text-slate-500 dark:text-slate-400">{session.topic}</p>

@@ -7,6 +7,7 @@ import { fetchCompanyById, insertCompanyAdminRow, insertCompanyRow } from './que
 import { acceptMentorInvites } from './rpc'
 import { friendlyError, userError } from '../errors'
 import { accountTypeFromDb, DB_ACCOUNT_TYPE } from '../accountType'
+import { PROFILE_SETUP_PENDING } from '../profileSetup'
 
 interface SignUpOutcome {
   pendingConfirmation: boolean
@@ -185,8 +186,14 @@ function assertNewAccount(
   return { pendingConfirmation: !data.session }
 }
 
+// Toda conta nova nasce com a tela "Complete seu perfil" pendente (ver lib/profileSetup.ts).
+
 export async function signUpStudent(name: string, email: string, password: string): Promise<SignUpOutcome> {
-  const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: { data: { account_type: DB_ACCOUNT_TYPE.student, name: name.trim() } } })
+  const { data, error } = await supabase.auth.signUp({
+    email: email.trim(),
+    password,
+    options: { data: { account_type: DB_ACCOUNT_TYPE.student, name: name.trim(), ...PROFILE_SETUP_PENDING } },
+  })
   return assertNewAccount(data, error, 'student')
 }
 
@@ -194,7 +201,7 @@ export async function signUpMentor(name: string, email: string, password: string
   const { data, error } = await supabase.auth.signUp({
     email: email.trim(),
     password,
-    options: { data: { account_type: DB_ACCOUNT_TYPE.mentor, name: name.trim(), bio: bio.trim(), skills } },
+    options: { data: { account_type: DB_ACCOUNT_TYPE.mentor, name: name.trim(), bio: bio.trim(), skills, ...PROFILE_SETUP_PENDING } },
   })
   return assertNewAccount(data, error, 'mentor')
 }
@@ -220,6 +227,7 @@ export async function signUpCompany(input: {
         cnpj: input.cnpj,
         sector: input.sector,
         company_email: input.email.trim(),
+        ...PROFILE_SETUP_PENDING,
       },
     },
   })

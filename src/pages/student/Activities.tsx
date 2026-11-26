@@ -124,7 +124,7 @@ export default function StudentActivities() {
                   )}
                   <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-400">
                     <span className="flex items-center gap-1.5">
-                      <Avatar name={mentor?.name ?? '?'} size="sm" className="h-5 w-5 text-[9px]" /> Passada por {mentor?.name ?? 'seu mentor'}
+                      <Avatar name={mentor?.name ?? '?'} src={mentor?.avatarUrl} size="sm" className="h-5 w-5 text-[9px]" /> Passada por {mentor?.name ?? 'seu mentor'}
                     </span>
                     {activity.dueDate && (
                       <span className={cn('flex items-center gap-1', overdue && 'font-semibold text-red-500')}>

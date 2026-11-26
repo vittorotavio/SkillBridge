@@ -1,6 +1,7 @@
 import { supabase } from '../../supabaseClient'
 import type { Availability, Mentor } from '../../../types'
 import { userError } from '../../errors'
+import { trustedAvatarUrl } from '../storage'
 
 interface MentorRow {
   id: string
@@ -23,7 +24,7 @@ function toMentor(row: MentorRow): Mentor {
     type: 'mentor',
     name: row.nome,
     email: row.email,
-    avatarUrl: row.url_avatar ?? undefined,
+    avatarUrl: trustedAvatarUrl(row.url_avatar, row.id),
     bio: row.biografia,
     skills: row.habilidade ?? [],
     pricePerSession: row.preco_sessao ?? 0,
@@ -86,10 +87,11 @@ export async function insertMentorRow(
 
 export async function updateMentorRow(
   id: string,
-  patch: Partial<{ bio: string; skills: string[]; pricePerSession: number; companyId: string | null }>
+  patch: Partial<{ bio: string; skills: string[]; pricePerSession: number; companyId: string | null; avatarUrl: string | null }>
 ) {
   const fields: Record<string, unknown> = {}
   if (patch.bio !== undefined) fields.biografia = patch.bio
+  if (patch.avatarUrl !== undefined) fields.url_avatar = patch.avatarUrl
   if (patch.skills !== undefined) fields.habilidade = patch.skills
   if (patch.pricePerSession !== undefined) fields.preco_sessao = patch.pricePerSession
   if (patch.companyId !== undefined) fields.empresa_id = patch.companyId

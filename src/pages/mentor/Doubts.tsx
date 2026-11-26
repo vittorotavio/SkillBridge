@@ -76,7 +76,7 @@ export default function MentorDoubts() {
                     selected === studentId ? 'bg-primary-50 dark:bg-primary-500/10' : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
                   )}
                 >
-                  <Avatar name={student?.name ?? '?'} />
+                  <Avatar name={student?.name ?? '?'} src={student?.avatarUrl} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-bold text-slate-800 dark:text-slate-100">{student?.name}</p>
                     <p className="truncate text-xs text-slate-400">{last ? last.body : 'Nenhuma mensagem ainda'}</p>

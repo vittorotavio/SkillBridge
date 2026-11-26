@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseVideoSource } from '../src/lib/video.ts'
+import { parseVideoSource, YOUTUBE_CAPTION_VARS } from '../src/lib/video.ts'
 import { parseMaterial, splitBold } from '../src/lib/material.ts'
 import { gradeActivity, hasAnswerKey, normalizeQuestion } from '../src/lib/activity.ts'
 import { advanceWatch, isFullyWatched, isSkippingAhead, watchedPercent } from '../src/lib/watch.ts'
@@ -76,6 +76,12 @@ test('parseVideoSource reconhece os formatos de link do YouTube', () => {
   assert.deepEqual(parseVideoSource('https://m.youtube.com/shorts/dQw4w9WgXcQ'), yt)
   assert.deepEqual(parseVideoSource('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'), yt)
   assert.equal(parseVideoSource('https://www.youtube.com/watch?v=curto'), null)
+})
+
+test('o player do YouTube abre com a legenda em português ligada', () => {
+  assert.equal(YOUTUBE_CAPTION_VARS.cc_load_policy, 1)
+  assert.equal(YOUTUBE_CAPTION_VARS.cc_lang_pref, 'pt')
+  assert.equal(YOUTUBE_CAPTION_VARS.hl, 'pt-BR')
 })
 
 test('parseVideoSource aceita arquivos de vídeo e recusa players que não informam o progresso', () => {

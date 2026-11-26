@@ -65,7 +65,7 @@ export default function MentorDashboard() {
             return (
               <div key={session.id} className="flex flex-col items-start justify-between gap-3 rounded-xl border border-slate-100 dark:border-slate-700/60 p-4 sm:flex-row sm:items-center">
                 <div className="flex items-center gap-3">
-                  <Avatar name={student?.name ?? '?'} />
+                  <Avatar name={student?.name ?? '?'} src={student?.avatarUrl} />
                   <div>
                     <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{student?.name}</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">{session.topic}</p>

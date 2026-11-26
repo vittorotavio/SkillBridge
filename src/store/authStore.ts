@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js'
 import type { AccountType, LoggedUser } from '../types'
 import { supabase } from '../lib/supabaseClient'
 import { resolveSessionUser, signIn as signInRequest, signOut as signOutRequest } from '../lib/supabase/auth'
+import { isProfileSetupPending, PROFILE_SETUP_KEY, type ProfileSetupOutcome } from '../lib/profileSetup'
 import { useDataStore, subscribeRealtime, unsubscribeRealtime } from './dataStore'
 
 interface AuthState {
@@ -10,10 +11,17 @@ interface AuthState {
   accountType: LoggedUser['type'] | null
   /** true enquanto a sessão ainda está sendo restaurada (evita redirect-flash pro /login no F5). */
   loading: boolean
+  /** Conta recém-criada que ainda não passou pela tela "Complete seu perfil" (lib/profileSetup.ts). */
+  profileSetupPending: boolean
   /** Lança erro (com mensagem pronta pra tela) se as credenciais ou o tipo de conta não baterem. */
   login: (email: string, password: string, expectedType: AccountType) => Promise<LoggedUser>
   logout: () => Promise<void>
   refresh: () => Promise<void>
+  /**
+   * Sai da tela "Complete seu perfil" ("Agora não" ou "Salvar e continuar"). A tela some na hora;
+   * a marca nos metadados do login é gravada em seguida e, se isso falhar, ela volta no próximo login.
+   */
+  finishProfileSetup: (outcome: ProfileSetupOutcome) => Promise<void>
 }
 
 /** Incrementado a cada evento de sessão — resoluções assíncronas de um evento antigo são descartadas
@@ -23,10 +31,16 @@ let authSeq = 0
 let loginInFlight = false
 /** Id (auth.users) da sessão já publicada: renovação de token da mesma conta não recarrega tudo. */
 let publishedAuthId: string | null = null
+/**
+ * Contas que já saíram da tela "Complete seu perfil" nesta aba. Um evento de sessão que chegue com os
+ * metadados antigos (ou a gravação da marca que falhou) não pode trazer a tela de volta.
+ */
+const profileSetupFinished = new Set<string>()
 
 function publish(authUser: User | null, user: LoggedUser | null) {
   publishedAuthId = user && authUser ? authUser.id : null
-  useAuthStore.setState({ user, accountType: user?.type ?? null, loading: false })
+  const profileSetupPending = !!user && !!authUser && isProfileSetupPending(authUser.user_metadata) && !profileSetupFinished.has(authUser.id)
+  useAuthStore.setState({ user, accountType: user?.type ?? null, loading: false, profileSetupPending })
   if (user) {
     void useDataStore.getState().fetchAll()
     subscribeRealtime()
@@ -50,6 +64,7 @@ export const useAuthStore = create<AuthState>(() => ({
   user: null,
   accountType: null,
   loading: true,
+  profileSetupPending: false,
 
   login: async (email, password, expectedType) => {
     loginInFlight = true
@@ -76,6 +91,22 @@ export const useAuthStore = create<AuthState>(() => ({
     const authUser = data.session?.user ?? null
     const user = authUser ? await safeResolve(authUser) : null
     if (seq === authSeq) publish(authUser, user)
+  },
+
+  finishProfileSetup: async (outcome) => {
+    const authId = publishedAuthId
+    if (!authId || !useAuthStore.getState().profileSetupPending) return
+    // Síncrono, antes de qualquer await: quem chama navega logo em seguida e a rota de destino não
+    // pode ver a tela ainda pendente (senão ela manda de volta para "Complete seu perfil").
+    profileSetupFinished.add(authId)
+    useAuthStore.setState({ profileSetupPending: false })
+    try {
+      // Mescla com os metadados do cadastro (o Supabase só troca as chaves enviadas).
+      const { error } = await supabase.auth.updateUser({ data: { [PROFILE_SETUP_KEY]: outcome } })
+      if (error) throw error
+    } catch (err) {
+      console.warn('Não foi possível registrar a saída da tela "Complete seu perfil"; ela volta no próximo login.', err)
+    }
   },
 }))
 

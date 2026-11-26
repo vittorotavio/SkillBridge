@@ -5,6 +5,8 @@
  */
 export interface AuthRedirect {
   isRecovery: boolean
+  /** Link de confirmação do cadastro ("#access_token=...&type=signup"): a conta acabou de ser ativada. */
+  isSignup: boolean
   /** Mensagem pronta para a tela quando o link veio com erro. */
   error: string | null
 }
@@ -22,5 +24,5 @@ export function parseAuthRedirect(hash: string, search: string): AuthRedirect {
   } else if (errorCode || errorDescription || get('error')) {
     error = 'Não foi possível validar o link de redefinição. Peça um novo abaixo.'
   }
-  return { isRecovery: get('type') === 'recovery', error }
+  return { isRecovery: get('type') === 'recovery', isSignup: get('type') === 'signup' && !error, error }
 }

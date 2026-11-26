@@ -187,7 +187,7 @@ export default function Landing() {
               >
                 <Card hoverable className="h-full">
                   <div className="flex items-center gap-3">
-                    <Avatar name={m.name} size="lg" />
+                    <Avatar name={m.name} src={m.avatarUrl} size="lg" />
                     <div>
                       <p className="font-bold text-slate-800 dark:text-slate-100">{m.name}</p>
                       <p className="flex items-center gap-1 text-xs text-slate-400">

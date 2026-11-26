@@ -67,7 +67,7 @@ export default function StudentDashboard() {
           {nextSession ? (
             <div className="flex flex-col items-start justify-between gap-4 rounded-xl bg-primary-50/60 dark:bg-primary-500/10 p-5 sm:flex-row sm:items-center">
               <div className="flex items-center gap-4">
-                <Avatar name={getMentorById(nextSession.mentorId)?.name ?? '?'} size="lg" />
+                <Avatar name={getMentorById(nextSession.mentorId)?.name ?? '?'} src={getMentorById(nextSession.mentorId)?.avatarUrl} size="lg" />
                 <div>
                   <p className="font-bold text-slate-800 dark:text-slate-100">{getMentorById(nextSession.mentorId)?.name}</p>
                   <p className="text-sm text-slate-500 dark:text-slate-400">{nextSession.topic}</p>

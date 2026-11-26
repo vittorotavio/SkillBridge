@@ -433,7 +433,7 @@ export default function JobsManagement() {
               return (
                 <div key={a.id} className="flex items-center justify-between gap-3 py-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <Avatar name={student?.name ?? '?'} size="sm" />
+                    <Avatar name={student?.name ?? '?'} src={student?.avatarUrl} size="sm" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{student?.name ?? 'Aluno que saiu do treinamento'}</p>
                       {student?.email && (

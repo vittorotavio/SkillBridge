@@ -1,5 +1,6 @@
 import { supabase } from '../../supabaseClient'
 import type { Student } from '../../../types'
+import { trustedAvatarUrl } from '../storage'
 
 interface StudentRow {
   id: string
@@ -20,7 +21,7 @@ function toStudent(row: StudentRow): Student {
     type: 'student',
     name: row.nome,
     email: row.email,
-    avatarUrl: row.url_avatar ?? undefined,
+    avatarUrl: trustedAvatarUrl(row.url_avatar, row.id),
     bio: row.biografia ?? undefined,
     companyId: row.empresa_id ?? undefined,
     programId: row.programa_id ?? undefined,
@@ -52,13 +53,14 @@ export async function insertStudentRow(id: string, name: string, email: string) 
 
 export async function updateStudentRow(
   id: string,
-  patch: Partial<{ companyId: string | null; programId: string | null; bio: string; name: string }>
+  patch: Partial<{ companyId: string | null; programId: string | null; bio: string; name: string; avatarUrl: string | null }>
 ) {
   const fields: Record<string, unknown> = {}
   if (patch.name !== undefined) fields.nome = patch.name
   if (patch.companyId !== undefined) fields.empresa_id = patch.companyId
   if (patch.programId !== undefined) fields.programa_id = patch.programId
   if (patch.bio !== undefined) fields.biografia = patch.bio
+  if (patch.avatarUrl !== undefined) fields.url_avatar = patch.avatarUrl
   if (Object.keys(fields).length === 0) return
   const { error } = await supabase.from('aluno').update(fields).eq('id', id)
   if (error) throw error

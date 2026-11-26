@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Building2, Plus, Star, X } from 'lucide-react'
+import { Building2, Star } from 'lucide-react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { MentorSidebar } from '../../components/layout/MentorSidebar'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -7,9 +7,12 @@ import { Card, CardHeader, CardTitle } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea } from '../../components/ui/Field'
 import { Avatar } from '../../components/ui/Avatar'
+import { PhotoField } from '../../components/profile/PhotoField'
+import { SkillsInput } from '../../components/profile/SkillsInput'
 import { useAuthStore } from '../../store/authStore'
 import { useCurrentMentor, useDataStore } from '../../store/dataStore'
 import { friendlyError } from '../../lib/errors'
+import { KEEP_PHOTO, type PhotoDraft } from '../../lib/profileImage'
 import type { Mentor } from '../../types'
 
 /**
@@ -18,20 +21,13 @@ import type { Mentor } from '../../types'
  */
 function AboutCard({ mentor }: { mentor: Mentor }) {
   const updateMentorProfile = useDataStore((s) => s.updateMentorProfile)
-  const [newSkill, setNewSkill] = useState('')
+  const [photo, setPhoto] = useState<PhotoDraft>(KEEP_PHOTO)
   const [skills, setSkills] = useState<string[]>(mentor.skills)
   const [bio, setBio] = useState(mentor.bio)
   const [price, setPrice] = useState(mentor.pricePerSession)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const addSkill = () => {
-    const skill = newSkill.trim()
-    if (!skill) return
-    if (!skills.some((s) => s.toLowerCase() === skill.toLowerCase())) setSkills((s) => [...s, skill])
-    setNewSkill('')
-  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,7 +39,8 @@ function AboutCard({ mentor }: { mentor: Mentor }) {
     }
     setSaving(true)
     try {
-      await updateMentorProfile(mentor.id, { bio: bio.trim(), pricePerSession: Math.max(0, Math.round((price || 0) * 100) / 100), skills })
+      await updateMentorProfile(mentor.id, { bio: bio.trim(), pricePerSession: Math.max(0, Math.round((price || 0) * 100) / 100), skills }, photo)
+      setPhoto(KEEP_PHOTO)
       setSaved(true)
     } catch (err) {
       setError(friendlyError(err, 'Não foi possível salvar o perfil. Tente novamente.'))
@@ -58,6 +55,18 @@ function AboutCard({ mentor }: { mentor: Mentor }) {
         <CardTitle>Sobre você</CardTitle>
       </CardHeader>
       <form onSubmit={handleSave}>
+        <div className="mb-5">
+          <PhotoField
+            name={mentor.name}
+            currentUrl={mentor.avatarUrl}
+            draft={photo}
+            onChange={(draft) => {
+              setPhoto(draft)
+              setSaved(false)
+            }}
+            disabled={saving}
+          />
+        </div>
         <Textarea label="Bio" value={bio} onChange={(e) => setBio(e.target.value)} required />
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Valor por sessão (R$)" type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(Number(e.target.value))} />
@@ -65,37 +74,7 @@ function AboutCard({ mentor }: { mentor: Mentor }) {
         </div>
 
         <div className="mt-4">
-          <p className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-200">Especialidades / skills</p>
-          <div className="mb-3 flex flex-wrap gap-2">
-            {skills.map((skill) => (
-              <span key={skill} className="flex items-center gap-1.5 rounded-full bg-primary-50 dark:bg-primary-500/10 px-3 py-1.5 text-xs font-semibold text-primary-600">
-                {skill}
-                <button
-                  type="button"
-                  onClick={() => setSkills((s) => s.filter((x) => x !== skill))}
-                  className="text-primary-300 hover:text-red-500"
-                  aria-label={`Remover ${skill}`}
-                >
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-            {skills.length === 0 && <span className="text-xs text-slate-400">Nenhuma especialidade ainda.</span>}
-          </div>
-          <div className="flex gap-2">
-            <input
-              value={newSkill}
-              onChange={(e) => setNewSkill(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSkill())}
-              placeholder="Adicionar especialidade"
-              aria-label="Nova especialidade"
-              maxLength={40}
-              className="min-w-0 flex-1 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 px-3.5 py-2.5 text-sm focus:border-primary-400 focus:outline-none focus:ring-4 focus:ring-primary-100"
-            />
-            <Button type="button" variant="secondary" icon={<Plus size={15} />} onClick={addSkill}>
-              Adicionar
-            </Button>
-          </div>
+          <SkillsInput skills={skills} onChange={setSkills} />
         </div>
 
         <div className="mt-5 flex items-center gap-3">
@@ -130,7 +109,7 @@ export default function MentorProfile() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-1">
           <Card className="text-center">
-            <Avatar name={mentor.name} size="lg" className="mx-auto h-20 w-20 text-2xl" />
+            <Avatar name={mentor.name} src={mentor.avatarUrl} size="lg" className="mx-auto h-20 w-20 text-2xl" />
             <h2 className="mt-4 text-lg font-bold text-slate-900 dark:text-slate-50">{mentor.name}</h2>
             <p className="text-sm text-slate-400">{mentor.email}</p>
             <p className="mt-2 flex items-center justify-center gap-1 text-sm font-semibold text-slate-700 dark:text-slate-200">

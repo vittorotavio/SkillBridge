@@ -146,7 +146,7 @@ export default function StudentsManagement() {
                 <tr key={req.id}>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <Avatar name={req.student?.name ?? '?'} size="sm" />
+                      <Avatar name={req.student?.name ?? '?'} src={req.student?.avatarUrl} size="sm" />
                       <div>
                         <p className="font-semibold text-slate-800 dark:text-slate-100">{req.student?.name ?? 'Aluno'}</p>
                         <p className="text-xs text-slate-400">{req.student?.email}</p>
@@ -203,7 +203,7 @@ export default function StudentsManagement() {
             return (
               <div key={s.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex min-w-0 items-center gap-3">
-                  <Avatar name={s.name} size="sm" />
+                  <Avatar name={s.name} src={s.avatarUrl} size="sm" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{s.name}</p>
                     <p className="truncate text-xs text-slate-400">{s.email}</p>

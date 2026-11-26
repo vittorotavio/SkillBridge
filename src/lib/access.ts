@@ -59,8 +59,3 @@ export function getVisibleJobsForStudent(jobs: Job[], student: Student | null | 
   if (!isStudentInProgram(student)) return []
   return jobs.filter((j) => j.programIds.includes(student!.programId!))
 }
-
-export function courseOriginLabel(course: Course, companyName?: string): string | null {
-  if (!course.companyId) return null
-  return `Curso da ${companyName ?? 'empresa'}`
-}

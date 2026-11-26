@@ -73,7 +73,7 @@ export default function CompanyDashboard() {
               return (
                 <div key={req.id} className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 dark:border-slate-700/60 p-3.5">
                   <div className="flex items-center gap-3">
-                    <Avatar name={student?.name ?? '?'} />
+                    <Avatar name={student?.name ?? '?'} src={student?.avatarUrl} />
                     <div>
                       <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{student?.name}</p>
                       <p className="text-xs text-slate-400">{student?.email}</p>
@@ -113,7 +113,7 @@ export default function CompanyDashboard() {
             <div className="space-y-3">
               {companyMentors.map((m) => (
                 <div key={m.id} className="flex items-center gap-3">
-                  <Avatar name={m.name} size="sm" />
+                  <Avatar name={m.name} src={m.avatarUrl} size="sm" />
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{m.name}</p>
                     <p className="truncate text-xs text-slate-400">{m.skills.slice(0, 2).join(', ')}</p>

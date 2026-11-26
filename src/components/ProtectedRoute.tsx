@@ -5,6 +5,7 @@ import type { AccountType } from '../types'
 import { useAuthStore } from '../store/authStore'
 import { useDataStore } from '../store/dataStore'
 import { homePathFor } from '../lib/routes'
+import { PROFILE_SETUP_PATH } from '../lib/profileSetup'
 import { Button } from './ui/Button'
 
 function FullScreen({ children }: { children: ReactNode }) {
@@ -19,10 +20,19 @@ function Spinner() {
   )
 }
 
-export function ProtectedRoute({ accountType, children }: { accountType: AccountType; children: ReactNode }) {
+interface ProtectedRouteProps {
+  /** Tipo de conta dono da rota. Sem ele, qualquer conta logada entra (ex: "Complete seu perfil"). */
+  accountType?: AccountType
+  /** A própria tela "Complete seu perfil": não redireciona para ela mesma. */
+  allowPendingSetup?: boolean
+  children: ReactNode
+}
+
+export function ProtectedRoute({ accountType, allowPendingSetup, children }: ProtectedRouteProps) {
   const location = useLocation()
   const loading = useAuthStore((s) => s.loading)
   const currentType = useAuthStore((s) => s.accountType)
+  const profileSetupPending = useAuthStore((s) => s.profileSetupPending)
   const dataLoaded = useDataStore((s) => s.dataLoaded)
   const loadError = useDataStore((s) => s.loadError)
   const fetchAll = useDataStore((s) => s.fetchAll)
@@ -35,7 +45,13 @@ export function ProtectedRoute({ accountType, children }: { accountType: Account
   if (!currentType) return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />
 
   // Logado com outro tipo de conta (ex: mentor abrindo /aluno): leva para o próprio painel.
-  if (currentType !== accountType) return <Navigate to={homePathFor(currentType)} replace />
+  if (accountType && currentType !== accountType) return <Navigate to={homePathFor(currentType)} replace />
+
+  // Conta recém-criada passa primeiro por "Complete seu perfil" (uma vez só; "Agora não" libera o
+  // painel). A página pedida segue junto, para continuar nela depois.
+  if (profileSetupPending && !allowPendingSetup) {
+    return <Navigate to={PROFILE_SETUP_PATH} replace state={{ from: location.pathname + location.search }} />
+  }
 
   // As telas leem tudo do dataStore: sem esperar a primeira carga elas renderizavam vazias
   // (ou nada, nos `return null`) e, se a carga falhasse, ficavam assim para sempre.

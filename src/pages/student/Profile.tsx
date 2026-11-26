@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Award, Building2, CalendarRange, Mail, SquarePen } from 'lucide-react'
+import { Award, Building2, CalendarRange, Camera, Mail, SquarePen } from 'lucide-react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { StudentSidebar } from '../../components/layout/StudentSidebar'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -10,16 +10,19 @@ import { ProgramStatusBadge } from '../../components/ui/ProgramStatusBadge'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { Input, Textarea } from '../../components/ui/Field'
+import { PhotoField } from '../../components/profile/PhotoField'
 import { useAuthStore } from '../../store/authStore'
 import { useDataStore, useCurrentStudent } from '../../store/dataStore'
 import { isStudentInProgram } from '../../lib/access'
 import { formatDateBR } from '../../lib/date'
 import { friendlyError } from '../../lib/errors'
+import { KEEP_PHOTO, type PhotoDraft } from '../../lib/profileImage'
 import { cleanName } from '../../lib/validation'
 import type { Student } from '../../types'
 
 function EditProfileModal({ student, onClose }: { student: Student; onClose: () => void }) {
   const updateStudentProfile = useDataStore((s) => s.updateStudentProfile)
+  const [photo, setPhoto] = useState<PhotoDraft>(KEEP_PHOTO)
   const [name, setName] = useState(student.name)
   const [bio, setBio] = useState(student.bio ?? '')
   const [saving, setSaving] = useState(false)
@@ -35,7 +38,7 @@ function EditProfileModal({ student, onClose }: { student: Student; onClose: () 
     }
     setSaving(true)
     try {
-      await updateStudentProfile(student.id, { name: cleanedName, bio: bio.trim() })
+      await updateStudentProfile(student.id, { name: cleanedName, bio: bio.trim() }, photo)
       onClose()
     } catch (err) {
       setError(friendlyError(err, 'Não foi possível salvar o perfil. Tente novamente.'))
@@ -49,7 +52,7 @@ function EditProfileModal({ student, onClose }: { student: Student; onClose: () 
       open
       onClose={() => !saving && onClose()}
       title="Editar perfil"
-      description="Seu nome e sua bio aparecem para mentores e para as empresas dos treinamentos em que você está."
+      description="Sua foto, seu nome e sua bio aparecem para mentores e para as empresas dos treinamentos em que você está."
       footer={
         <>
           <Button variant="ghost" onClick={onClose} disabled={saving}>
@@ -62,6 +65,7 @@ function EditProfileModal({ student, onClose }: { student: Student; onClose: () 
       }
     >
       <form id="edit-profile-form" className="space-y-4" onSubmit={handleSubmit}>
+        <PhotoField name={name.trim() || student.name} currentUrl={student.avatarUrl} draft={photo} onChange={setPhoto} disabled={saving} />
         <Input label="Nome completo" value={name} onChange={(e) => setName(e.target.value)} required minLength={3} maxLength={80} />
         <Input label="E-mail" value={student.email} disabled hint="O e-mail é o seu login e não pode ser alterado aqui." />
         <Textarea
@@ -106,7 +110,18 @@ export default function StudentProfile() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-1">
           <Card className="text-center">
-            <Avatar name={student.name} size="lg" className="mx-auto h-20 w-20 text-2xl" />
+            <div className="relative mx-auto h-20 w-20">
+              <Avatar name={student.name} src={student.avatarUrl} size="lg" className="h-20 w-20 text-2xl" />
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-white shadow-soft ring-4 ring-slate-50 transition-colors hover:bg-primary-600 focus-visible:outline-none focus-visible:ring-primary-200 dark:ring-slate-800"
+                aria-label={student.avatarUrl ? 'Trocar foto de perfil' : 'Adicionar foto de perfil'}
+                title={student.avatarUrl ? 'Trocar foto' : 'Adicionar foto'}
+              >
+                <Camera size={15} />
+              </button>
+            </div>
             <h2 className="mt-4 text-lg font-bold text-slate-900 dark:text-slate-50">{student.name}</h2>
             <p className="flex items-center justify-center gap-1.5 text-sm text-slate-400">
               <Mail size={13} /> {student.email}

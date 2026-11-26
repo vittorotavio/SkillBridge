@@ -32,3 +32,10 @@ export function parseVideoSource(value: string | null | undefined): VideoSource 
 
 /** Mensagem do editor para links que o player não aceita. */
 export const VIDEO_SOURCE_HINT = 'um link https do YouTube ou de um arquivo de vídeo (.mp4 ou .webm)'
+
+/**
+ * Legendas automáticas: o player do YouTube já abre com a legenda em português ligada (a enviada
+ * pelo autor ou, se não houver, a gerada automaticamente pelo YouTube) e com os menus em pt-BR.
+ * O aluno pode desligar no botão CC do player. Arquivos .mp4/.webm não têm legenda automática.
+ */
+export const YOUTUBE_CAPTION_VARS = { cc_load_policy: 1, cc_lang_pref: 'pt', hl: 'pt-BR' } as const

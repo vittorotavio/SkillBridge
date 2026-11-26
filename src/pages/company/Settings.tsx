@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Building2, Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2 } from 'lucide-react'
 import { DashboardLayout } from '../../components/layout/DashboardLayout'
 import { CompanySidebar } from '../../components/layout/CompanySidebar'
 import { PageHeader } from '../../components/ui/PageHeader'
@@ -8,12 +8,82 @@ import { Button } from '../../components/ui/Button'
 import { Input, Select } from '../../components/ui/Field'
 import { Avatar } from '../../components/ui/Avatar'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { PhotoField } from '../../components/profile/PhotoField'
 import { useAuthStore } from '../../store/authStore'
 import { useDataStore } from '../../store/dataStore'
 import { supabase } from '../../lib/supabaseClient'
 import { SECTORS } from '../../lib/catalog'
 import { friendlyError } from '../../lib/errors'
-import { cleanName, safeHttpUrl } from '../../lib/validation'
+import { KEEP_PHOTO, type PhotoDraft } from '../../lib/profileImage'
+import { cleanName } from '../../lib/validation'
+import type { Company } from '../../types'
+
+/** Cartão "Identidade": envio do logo (Storage), salvo à parte dos dados cadastrais. */
+function IdentityCard({ company, displayName }: { company: Company; displayName: string }) {
+  const updateCompanyProfile = useDataStore((s) => s.updateCompanyProfile)
+  const [logo, setLogo] = useState<PhotoDraft>(KEEP_PHOTO)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const save = async () => {
+    setSaving(true)
+    setSaved(false)
+    setError(null)
+    try {
+      await updateCompanyProfile(company.id, {}, logo)
+      setLogo(KEEP_PHOTO)
+      setSaved(true)
+    } catch (err) {
+      setError(friendlyError(err, 'Não foi possível salvar o logo. Tente novamente.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Identidade</CardTitle>
+      </CardHeader>
+      <div className="rounded-xl bg-primary-50/60 p-5 dark:bg-primary-500/10">
+        <PhotoField
+          kind="logo"
+          layout="stacked"
+          name={displayName}
+          currentUrl={company.logoUrl}
+          draft={logo}
+          onChange={(draft) => {
+            setLogo(draft)
+            setSaved(false)
+            setError(null)
+          }}
+          disabled={saving}
+        />
+        <div className="mt-4 text-center">
+          <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{displayName}</p>
+          <p className="text-xs text-slate-400">{company.cnpj}</p>
+        </div>
+      </div>
+      {logo.kind !== 'keep' && (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={() => void save()} disabled={saving}>
+            {saving ? 'Salvando...' : logo.kind === 'remove' ? 'Remover logo' : 'Salvar logo'}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setLogo(KEEP_PHOTO)} disabled={saving}>
+            Cancelar
+          </Button>
+        </div>
+      )}
+      {saved && <p className="mt-3 text-sm font-semibold text-emerald-600">Logo atualizado!</p>}
+      {error && (
+        <p role="alert" className="mt-3 text-sm font-semibold text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      )}
+    </Card>
+  )
+}
 
 export default function CompanySettings() {
   const authUser = useAuthStore((s) => s.user)
@@ -31,7 +101,6 @@ export default function CompanySettings() {
   const [adminAdded, setAdminAdded] = useState(false)
   const [toRemove, setToRemove] = useState<{ id: string; name: string } | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [logoBroken, setLogoBroken] = useState(false)
   /** Login de quem está usando o painel: não pode remover o próprio acesso. */
   const [myAdminId, setMyAdminId] = useState<string | null>(null)
 
@@ -43,7 +112,6 @@ export default function CompanySettings() {
   const [razaoSocial, setRazaoSocial] = useState(company?.razaoSocial ?? '')
   const [sector, setSector] = useState<string>(company?.sector ?? SECTORS[0])
   const [email, setEmail] = useState(company?.email ?? '')
-  const [logoUrl, setLogoUrl] = useState(company?.logoUrl ?? '')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -85,14 +153,9 @@ export default function CompanySettings() {
       setSaveError('Preencha nome fantasia e razão social.')
       return
     }
-    const logo = logoUrl.trim()
-    if (logo && !safeHttpUrl(logo)) {
-      setSaveError('A URL do logo precisa começar com http:// ou https://.')
-      return
-    }
     setSaving(true)
     try {
-      await updateCompanyProfile(company.id, { name: cleanFantasia, razaoSocial: cleanRazao, sector, email: email.trim(), logoUrl: logo })
+      await updateCompanyProfile(company.id, { name: cleanFantasia, razaoSocial: cleanRazao, sector, email: email.trim() })
       setSaved(true)
     } catch (err) {
       setSaveError(friendlyError(err, 'Não foi possível salvar. Verifique os dados e tente novamente.'))
@@ -126,17 +189,6 @@ export default function CompanySettings() {
               </Select>
               <Input label="E-mail corporativo" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
-            <Input
-              label="URL do logo"
-              type="url"
-              placeholder="https://..."
-              value={logoUrl}
-              onChange={(e) => {
-                setLogoUrl(e.target.value)
-                setLogoBroken(false)
-              }}
-              hint="A pré-visualização aparece no cartão de identidade ao lado."
-            />
             <div className="mt-2 flex items-center gap-3">
               <Button type="submit" disabled={saving}>
                 {saving ? 'Salvando...' : 'Salvar alterações'}
@@ -147,23 +199,7 @@ export default function CompanySettings() {
           </form>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Identidade</CardTitle>
-          </CardHeader>
-          <div className="flex flex-col items-center rounded-xl bg-primary-50/60 dark:bg-primary-500/10 p-6 text-center">
-            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-white text-primary-600 shadow-soft dark:bg-slate-700 dark:text-primary-300">
-              {safeHttpUrl(logoUrl) && !logoBroken ? (
-                <img src={safeHttpUrl(logoUrl)!} alt={`Logo da ${name || company.name}`} onError={() => setLogoBroken(true)} className="h-full w-full object-contain" />
-              ) : (
-                <Building2 size={28} />
-              )}
-            </div>
-            <p className="mt-3 text-sm font-bold text-slate-800 dark:text-slate-100">{name || company.name}</p>
-            <p className="text-xs text-slate-400">{company.cnpj}</p>
-            {logoBroken && <p className="mt-2 text-xs font-semibold text-amber-600">Não foi possível carregar a imagem dessa URL.</p>}
-          </div>
-        </Card>
+        <IdentityCard company={company} displayName={name.trim() || company.name} />
       </div>
 
       <Card className="mt-6">
