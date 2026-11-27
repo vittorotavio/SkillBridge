@@ -1,5 +1,6 @@
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { supabase } from '../supabaseClient'
+import { userError } from '../errors'
 
 /**
  * Criar o login de outra pessoa (mentor ou administrador da empresa) exige a chave de serviço,
@@ -20,16 +21,18 @@ const messages: Record<string, string> = {
   not_found: 'Administrador não encontrado nesta empresa.',
 }
 
+// userError: as telas mostram o erro com friendlyError, que só repassa o texto de erros marcados
+// como "mensagem para o usuário"; com um Error comum, o motivo real virava uma mensagem genérica.
 export async function callCompanyUsers(body: CompanyUsersAction): Promise<void> {
   const { error } = await supabase.functions.invoke('company-users', { body })
   if (!error) return
   if (error instanceof FunctionsHttpError) {
     if (error.context.status === 404) {
-      throw new Error('Este recurso depende da função "company-users" no servidor, que ainda não foi publicada.')
+      throw userError('Este recurso depende da função "company-users" no servidor, que ainda não foi publicada.')
     }
     const payload = await error.context.json().catch(() => null)
-    throw new Error(messages[payload?.error] ?? 'Não foi possível concluir. Tente novamente.')
+    throw userError(messages[payload?.error] ?? 'Não foi possível concluir. Tente novamente.')
   }
   // No navegador, função ainda não publicada aparece aqui (o preflight CORS recebe 404), não como 404.
-  throw new Error('Não foi possível acessar o serviço de cadastro. Verifique sua conexão; se continuar, a função "company-users" ainda não foi publicada no servidor.')
+  throw userError('Não foi possível acessar o serviço de cadastro. Verifique sua conexão; se continuar, a função "company-users" ainda não foi publicada no servidor.')
 }
