@@ -2,11 +2,11 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { INFO_PAGES } from './pages/institutional/infoPages'
 import { ProtectedRoute } from './components/ProtectedRoute'
-import { SignupHandedOff } from './components/auth/SignupHandedOff'
-import { isRecoverySession, onPasswordRecovery, RESET_PASSWORD_PATH } from './lib/supabase/passwordRecovery'
+import { EmailLinkHandedOff } from './components/auth/EmailLinkHandedOff'
+import { RESET_PASSWORD_PATH } from './lib/supabase/passwordRecovery'
 import { initialAuthRedirect, supabase } from './lib/supabaseClient'
 import { PROFILE_SETUP_PATH } from './lib/profileSetup'
-import { handOffSignupConfirmation } from './lib/signupHandoff'
+import { handOffEmailLink, type EmailLinkKind } from './lib/emailLinkHandoff'
 import { useAuthStore } from './store/authStore'
 
 // Cada tela vira um pedaço separado do bundle, baixado só quando a rota é aberta (antes tudo ia num
@@ -56,53 +56,42 @@ function RouteFallback() {
   )
 }
 
-/**
- * O link do e-mail de redefinição de senha deve abrir /redefinir-senha. Se o Supabase mandar para
- * outra página (URL não liberada nas configurações de Auth cai na página inicial), leva até lá.
- */
-let initialRecoveryChecked = false
-function PasswordRecoveryRedirect() {
-  const navigate = useNavigate()
-  useEffect(() => {
-    const go = () => {
-      if (window.location.pathname !== RESET_PASSWORD_PATH) navigate(RESET_PASSWORD_PATH, { replace: true })
-    }
-    // Só na abertura do link: quem saiu da página sem trocar a senha não é puxado de volta depois.
-    if (!initialRecoveryChecked) {
-      initialRecoveryChecked = true
-      if (isRecoverySession()) go()
-    }
-    return onPasswordRecovery(go)
-  }, [navigate])
-  return null
-}
+/** Link do e-mail que abriu esta aba (lido antes de o cliente apagar o "#access_token=..." da URL). */
+const emailLinkKind: EmailLinkKind | null = initialAuthRedirect.isSignup ? 'signup' : initialAuthRedirect.isRecovery ? 'recovery' : null
+
+/** Para onde a aba aberta pelo link segue quando continua nela mesma. Só na abertura do link: quem
+ * sai da página depois não é puxado de volta. */
+let emailLinkRedirected = false
+/** 'checking': procurando a aba que esperava o link; 'handed-off': ela assumiu; 'here': segue nesta aba. */
+type EmailLinkStep = 'checking' | 'handed-off' | 'here'
 
 /**
- * O link de confirmação do cadastro (e-mail) abre o site já logado, numa aba nova. Primeiro procura a
- * aba do cadastro (lib/signupHandoff.ts): se ela ainda estiver aberta neste navegador, o cadastro
- * continua lá e esta aba tenta se fechar. Senão, conta nova segue aqui direto para "Complete seu
- * perfil" em vez de parar na vitrine; vale só para esse link.
+ * Links do e-mail (confirmar o cadastro, redefinir a senha) abrem o site já logado, numa aba nova.
+ * Primeiro procura a aba que ficou esperando o link (lib/emailLinkHandoff.ts): se ela ainda estiver
+ * aberta neste navegador, o fluxo continua lá e esta aba tenta se fechar. Senão, segue nesta aba:
+ * - cadastro: direto para "Complete seu perfil" em vez de parar na vitrine;
+ * - senha: para /redefinir-senha (se o Supabase mandou para outra página, por exemplo a inicial
+ *   quando a URL não está liberada nas configurações de Auth).
+ * As outras abas abertas não mudam de página: o Supabase repassa a elas o evento PASSWORD_RECOVERY,
+ * mas só a aba do link (ou a que esperava, avisada por ela) vai para a nova senha.
  */
-let signupConfirmationHandled = false
-/** 'checking': procurando a aba do cadastro; 'handed-off': ela assumiu; 'here': segue nesta aba. */
-type SignupStep = 'checking' | 'handed-off' | 'here'
-
-function SignupConfirmationRedirect() {
+function EmailLinkRedirect() {
   const navigate = useNavigate()
   const profileSetupPending = useAuthStore((s) => s.profileSetupPending)
-  const [step, setStep] = useState<SignupStep>(() => (initialAuthRedirect.isSignup && !signupConfirmationHandled ? 'checking' : 'here'))
+  const [step, setStep] = useState<EmailLinkStep>(() => (emailLinkKind && !emailLinkRedirected ? 'checking' : 'here'))
 
   useEffect(() => {
-    if (step !== 'checking') return
+    if (step !== 'checking' || !emailLinkKind) return
     let active = true
     void (async () => {
       const { data } = await supabase.auth.getSession()
       const email = data.session?.user.email
-      const handedOff = email ? await handOffSignupConfirmation(email) : false
+      // Link vencido ou já usado não abre sessão nova: segue aqui para a tela que explica o erro.
+      const handedOff = email && !initialAuthRedirect.error ? await handOffEmailLink(emailLinkKind, email) : false
       if (!active) return
       setStep(handedOff ? 'handed-off' : 'here')
-      // O navegador só deixa o site fechar a aba que ele mesmo abriu (ou aberta por link, sem
-      // histórico); quando não deixa, fica o aviso "Pode fechar esta aba".
+      // O navegador só deixa o site fechar a aba que ele mesmo abriu (link com target=_blank, como
+      // nos webmails); quando não deixa, fica o aviso "Pode fechar esta aba".
       if (handedOff) window.close()
     })()
     return () => {
@@ -111,20 +100,22 @@ function SignupConfirmationRedirect() {
   }, [step])
 
   useEffect(() => {
-    if (step !== 'here' || signupConfirmationHandled || !initialAuthRedirect.isSignup || !profileSetupPending) return
-    signupConfirmationHandled = true
-    if (window.location.pathname !== PROFILE_SETUP_PATH) navigate(PROFILE_SETUP_PATH, { replace: true })
+    if (step !== 'here' || emailLinkRedirected || !emailLinkKind) return
+    const target = emailLinkKind === 'recovery' ? RESET_PASSWORD_PATH : PROFILE_SETUP_PATH
+    // Cadastro: espera a conta carregar (a tela "Complete seu perfil" só existe para conta nova).
+    if (emailLinkKind === 'signup' && !profileSetupPending) return
+    emailLinkRedirected = true
+    if (window.location.pathname !== target) navigate(target, { replace: true })
   }, [step, profileSetupPending, navigate])
 
-  if (step === 'handed-off') return <SignupHandedOff onContinueHere={() => setStep('here')} />
+  if (step === 'handed-off' && emailLinkKind) return <EmailLinkHandedOff kind={emailLinkKind} onContinueHere={() => setStep('here')} />
   return null
 }
 
 export default function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
-      <PasswordRecoveryRedirect />
-      <SignupConfirmationRedirect />
+      <EmailLinkRedirect />
       <Routes>
         <Route path="/" element={<Landing />} />
         {INFO_PAGES.map((slug) => (

@@ -24,6 +24,16 @@ export function isRecoverySession(): boolean {
   return recoverySession
 }
 
+/**
+ * A aba que esperava em "Confira seu e-mail" assumiu o link aberto em outra aba (lib/emailLinkHandoff.ts).
+ * A sessão já está no localStorage compartilhado; o evento PASSWORD_RECOVERY repassado pelo Supabase
+ * pode chegar antes ou depois deste aviso, então a aba marca a sessão por conta própria.
+ */
+export function markRecoverySession() {
+  recoverySession = true
+  listeners.forEach((fn) => fn())
+}
+
 /** Avisa quando um link de redefinição abre a sessão (para levar o usuário à página de nova senha). */
 export function onPasswordRecovery(fn: () => void): () => void {
   listeners.add(fn)

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { MailCheck } from 'lucide-react'
 import { PublicLayout } from '../../components/layout/PublicLayout'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Field'
-import { requestPasswordReset } from '../../lib/supabase/passwordRecovery'
+import { markRecoverySession, requestPasswordReset, RESET_PASSWORD_PATH } from '../../lib/supabase/passwordRecovery'
+import { listenForEmailLink } from '../../lib/emailLinkHandoff'
 import { friendlyError } from '../../lib/errors'
 
 /** Intervalo mínimo entre dois envios para o mesmo e-mail (o Supabase recusa antes de 60 s). */
@@ -14,6 +15,7 @@ const RESEND_SECONDS = 60
 export default function ForgotPassword() {
   // A tela de login passa o e-mail já digitado.
   const initialEmail = (useLocation().state as { email?: string } | null)?.email ?? ''
+  const navigate = useNavigate()
   const [email, setEmail] = useState(initialEmail)
   const [sentTo, setSentTo] = useState<string | null>(null)
   const [cooldown, setCooldown] = useState(0)
@@ -25,6 +27,16 @@ export default function ForgotPassword() {
     const timer = window.setTimeout(() => setCooldown((s) => s - 1), 1000)
     return () => window.clearTimeout(timer)
   }, [cooldown])
+
+  // O link do e-mail abre outra aba; se for neste navegador, ela avisa esta (lib/emailLinkHandoff.ts)
+  // e a nova senha é criada aqui mesmo.
+  useEffect(() => {
+    if (!sentTo) return
+    return listenForEmailLink('recovery', sentTo, () => {
+      markRecoverySession()
+      navigate(RESET_PASSWORD_PATH, { replace: true })
+    })
+  }, [sentTo, navigate])
 
   const send = async (target: string) => {
     setSending(true)
@@ -52,7 +64,8 @@ export default function ForgotPassword() {
               <h1 className="mt-4 text-2xl font-extrabold text-slate-900 dark:text-slate-50">Confira seu e-mail</h1>
               <p className="mt-2 text-sm text-slate-500 dark:text-slate-400" role="status">
                 Se existir uma conta com <strong className="text-slate-700 dark:text-slate-200">{sentTo}</strong>, enviamos um link para criar uma nova
-                senha. O link vale por tempo limitado. Se não encontrar a mensagem, confira a caixa de spam.
+                senha. Abra o link no e-mail: a nova senha é criada aqui nesta aba. O link vale por tempo limitado. Se não encontrar a
+                mensagem, confira a caixa de spam.
               </p>
               {error && <p className="mt-4 text-sm font-semibold text-red-600 dark:text-red-400">{error}</p>}
               <div className="mt-6 flex flex-col gap-3">

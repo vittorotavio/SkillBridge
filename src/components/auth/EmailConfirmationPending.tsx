@@ -4,13 +4,13 @@ import { CheckCircle2, MailCheck } from 'lucide-react'
 import { PublicLayout } from '../layout/PublicLayout'
 import { Card } from '../ui/Card'
 import { useAuthStore } from '../../store/authStore'
-import { listenForSignupConfirmation } from '../../lib/signupHandoff'
+import { listenForEmailLink } from '../../lib/emailLinkHandoff'
 import { homePathFor } from '../../lib/routes'
 import { cn } from '../../lib/cn'
 
 /**
  * Tela "Confirme seu e-mail" do cadastro. O link do e-mail abre outra aba; se for neste navegador,
- * ela avisa esta aba (lib/signupHandoff.ts) e o cadastro continua aqui, em "Complete seu perfil".
+ * ela avisa esta aba (lib/emailLinkHandoff.ts) e o cadastro continua aqui, em "Complete seu perfil".
  */
 export function EmailConfirmationPending({ email, className }: { email: string; className?: string }) {
   const navigate = useNavigate()
@@ -20,7 +20,7 @@ export function EmailConfirmationPending({ email, className }: { email: string; 
 
   useEffect(
     () =>
-      listenForSignupConfirmation(email, () => {
+      listenForEmailLink('signup', email, () => {
         setConfirmed(true)
         // O Supabase já avisa esta aba do login aberto na outra; o refresh garante, lendo a sessão gravada.
         void refresh()

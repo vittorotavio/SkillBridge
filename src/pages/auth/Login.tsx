@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/authStore'
 import type { AccountType } from '../../types'
 import { accountTypeForPath, homePathFor } from '../../lib/routes'
 import { friendlyError } from '../../lib/errors'
+import { isRecoverySession } from '../../lib/supabase/passwordRecovery'
 
 const typeConfig: Record<AccountType, { label: string; icon: typeof GraduationCap }> = {
   student: { label: 'Aluno', icon: GraduationCap },
@@ -38,7 +39,9 @@ export default function Login() {
   const config = typeConfig[type]
 
   // Já está logado (ex: voltou para /login pelo histórico): segue para o painel em vez de pedir login de novo.
-  if (!authLoading && loggedType && !submitting) {
+  // Sessão aberta por link de nova senha não conta: o Supabase a repassa para todas as abas, e uma aba
+  // parada no login não deve entrar no painel antes de a pessoa criar a senha.
+  if (!authLoading && loggedType && !submitting && !isRecoverySession()) {
     return <Navigate to={from && fromType === loggedType ? from : homePathFor(loggedType)} replace />
   }
 
