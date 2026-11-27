@@ -15,7 +15,8 @@ interface AuthState {
   profileSetupPending: boolean
   /** Lança erro (com mensagem pronta pra tela) se as credenciais ou o tipo de conta não baterem. */
   login: (email: string, password: string, expectedType: AccountType) => Promise<LoggedUser>
-  logout: () => Promise<void>
+  /** `local` depois de excluir a conta: o login não existe mais, não há o que encerrar no servidor. */
+  logout: (scope?: 'global' | 'local') => Promise<void>
   refresh: () => Promise<void>
   /**
    * Sai da tela "Complete seu perfil" ("Agora não" ou "Salvar e continuar"). A tela some na hora;
@@ -78,10 +79,10 @@ export const useAuthStore = create<AuthState>(() => ({
     }
   },
 
-  logout: async () => {
+  logout: async (scope) => {
     authSeq++
     publish(null, null)
-    await signOutRequest()
+    await signOutRequest(scope)
   },
 
   /** Relê a sessão atual (usado depois do cadastro, quando o signUp já abre sessão). */

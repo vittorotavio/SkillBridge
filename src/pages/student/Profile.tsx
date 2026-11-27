@@ -11,6 +11,7 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { Input, Textarea } from '../../components/ui/Field'
 import { PhotoField } from '../../components/profile/PhotoField'
+import { DeleteAccountCard } from '../../components/profile/DeleteAccountCard'
 import { useAuthStore } from '../../store/authStore'
 import { useDataStore, useCurrentStudent } from '../../store/dataStore'
 import { isStudentInProgram } from '../../lib/access'
@@ -202,6 +203,10 @@ export default function StudentProfile() {
             </ul>
           </Card>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <DeleteAccountCard accountType="student" />
       </div>
 
       {editing && <EditProfileModal student={student} onClose={() => setEditing(false)} />}

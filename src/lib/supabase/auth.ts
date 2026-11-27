@@ -161,8 +161,9 @@ export async function signIn(email: string, password: string, expectedType: Acco
   return { authUser: data.user, user }
 }
 
-export async function signOut() {
-  await supabase.auth.signOut()
+/** `local`: só esquece a sessão neste navegador, sem chamar o servidor (ex.: login que acabou de ser excluído). */
+export async function signOut(scope: 'global' | 'local' = 'global') {
+  await supabase.auth.signOut({ scope })
 }
 
 /**

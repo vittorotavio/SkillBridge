@@ -9,6 +9,7 @@ import { Input, Textarea } from '../../components/ui/Field'
 import { Avatar } from '../../components/ui/Avatar'
 import { PhotoField } from '../../components/profile/PhotoField'
 import { SkillsInput } from '../../components/profile/SkillsInput'
+import { DeleteAccountCard } from '../../components/profile/DeleteAccountCard'
 import { useAuthStore } from '../../store/authStore'
 import { useCurrentMentor, useDataStore } from '../../store/dataStore'
 import { friendlyError } from '../../lib/errors'
@@ -163,6 +164,10 @@ export default function MentorProfile() {
             </div>
           </Card>
         </div>
+      </div>
+
+      <div className="mt-6">
+        <DeleteAccountCard accountType="mentor" />
       </div>
     </DashboardLayout>
   )

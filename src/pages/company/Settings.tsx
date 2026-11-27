@@ -9,6 +9,7 @@ import { Input, Select } from '../../components/ui/Field'
 import { Avatar } from '../../components/ui/Avatar'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { PhotoField } from '../../components/profile/PhotoField'
+import { DeleteAccountCard } from '../../components/profile/DeleteAccountCard'
 import { useAuthStore } from '../../store/authStore'
 import { useDataStore } from '../../store/dataStore'
 import { supabase } from '../../lib/supabaseClient'
@@ -262,6 +263,17 @@ export default function CompanySettings() {
           <p className="mt-3 text-xs text-slate-400">O novo administrador entra pela aba Empresa com esse e-mail e a senha provisória.</p>
         </form>
       </Card>
+
+      <div className="mt-6">
+        <DeleteAccountCard
+          accountType="company"
+          blockedReason={
+            admins.length <= 1
+              ? 'Você é o único administrador da empresa. Para excluir a sua conta, adicione outro administrador acima: a empresa não pode ficar sem ninguém no painel.'
+              : undefined
+          }
+        />
+      </div>
 
       <ConfirmDialog
         open={!!toRemove}
