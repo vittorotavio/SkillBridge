@@ -1,10 +1,12 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { INFO_PAGES } from './pages/institutional/infoPages'
 import { ProtectedRoute } from './components/ProtectedRoute'
+import { SignupHandedOff } from './components/auth/SignupHandedOff'
 import { isRecoverySession, onPasswordRecovery, RESET_PASSWORD_PATH } from './lib/supabase/passwordRecovery'
-import { initialAuthRedirect } from './lib/supabaseClient'
+import { initialAuthRedirect, supabase } from './lib/supabaseClient'
 import { PROFILE_SETUP_PATH } from './lib/profileSetup'
+import { handOffSignupConfirmation } from './lib/signupHandoff'
 import { useAuthStore } from './store/authStore'
 
 // Cada tela vira um pedaço separado do bundle, baixado só quando a rota é aberta (antes tudo ia num
@@ -76,18 +78,45 @@ function PasswordRecoveryRedirect() {
 }
 
 /**
- * O link de confirmação do cadastro (e-mail) abre o site já logado, na página inicial. Conta nova
- * segue direto para "Complete seu perfil" em vez de parar na vitrine; vale só para esse link.
+ * O link de confirmação do cadastro (e-mail) abre o site já logado, numa aba nova. Primeiro procura a
+ * aba do cadastro (lib/signupHandoff.ts): se ela ainda estiver aberta neste navegador, o cadastro
+ * continua lá e esta aba tenta se fechar. Senão, conta nova segue aqui direto para "Complete seu
+ * perfil" em vez de parar na vitrine; vale só para esse link.
  */
 let signupConfirmationHandled = false
+/** 'checking': procurando a aba do cadastro; 'handed-off': ela assumiu; 'here': segue nesta aba. */
+type SignupStep = 'checking' | 'handed-off' | 'here'
+
 function SignupConfirmationRedirect() {
   const navigate = useNavigate()
   const profileSetupPending = useAuthStore((s) => s.profileSetupPending)
+  const [step, setStep] = useState<SignupStep>(() => (initialAuthRedirect.isSignup && !signupConfirmationHandled ? 'checking' : 'here'))
+
   useEffect(() => {
-    if (signupConfirmationHandled || !initialAuthRedirect.isSignup || !profileSetupPending) return
+    if (step !== 'checking') return
+    let active = true
+    void (async () => {
+      const { data } = await supabase.auth.getSession()
+      const email = data.session?.user.email
+      const handedOff = email ? await handOffSignupConfirmation(email) : false
+      if (!active) return
+      setStep(handedOff ? 'handed-off' : 'here')
+      // O navegador só deixa o site fechar a aba que ele mesmo abriu (ou aberta por link, sem
+      // histórico); quando não deixa, fica o aviso "Pode fechar esta aba".
+      if (handedOff) window.close()
+    })()
+    return () => {
+      active = false
+    }
+  }, [step])
+
+  useEffect(() => {
+    if (step !== 'here' || signupConfirmationHandled || !initialAuthRedirect.isSignup || !profileSetupPending) return
     signupConfirmationHandled = true
     if (window.location.pathname !== PROFILE_SETUP_PATH) navigate(PROFILE_SETUP_PATH, { replace: true })
-  }, [profileSetupPending, navigate])
+  }, [step, profileSetupPending, navigate])
+
+  if (step === 'handed-off') return <SignupHandedOff onContinueHere={() => setStep('here')} />
   return null
 }
 

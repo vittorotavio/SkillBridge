@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { GraduationCap, MailCheck, Users } from 'lucide-react'
+import { GraduationCap, Users } from 'lucide-react'
 import { PublicLayout } from '../../components/layout/PublicLayout'
+import { EmailConfirmationPending } from '../../components/auth/EmailConfirmationPending'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Input, Textarea } from '../../components/ui/Field'
@@ -64,24 +65,7 @@ export default function RegisterStudentMentor() {
     }
   }
 
-  if (pendingConfirmation) {
-    return (
-      <PublicLayout>
-        <div className="mx-auto flex max-w-lg flex-col items-center px-6 py-14">
-          <Card padding="lg" className="w-full text-center">
-            <MailCheck className="mx-auto text-primary-600" size={40} />
-            <h1 className="mt-4 text-2xl font-extrabold text-slate-900 dark:text-slate-50">Confirme seu e-mail</h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-              Enviamos um link de confirmação para <strong>{email}</strong>. Depois de confirmar, volte e entre normalmente.
-            </p>
-            <Link to="/login" className="mt-6 inline-block font-semibold text-primary-600 hover:underline">
-              Ir para o login
-            </Link>
-          </Card>
-        </div>
-      </PublicLayout>
-    )
-  }
+  if (pendingConfirmation) return <EmailConfirmationPending email={email.trim()} />
 
   return (
     <PublicLayout>
